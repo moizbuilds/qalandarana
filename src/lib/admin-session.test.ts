@@ -30,10 +30,14 @@ describe('admin session JWT', () => {
 
   it('returns null for a tampered token', async () => {
     const token = await createSessionJwt('moiz@example.com')
-    // Flip the last character of the signature segment — any change breaks the
-    // HMAC, so verification must fail rather than trust the altered payload.
-    const tampered = token.slice(0, -1) + (token.endsWith('a') ? 'b' : 'a')
-    expect(await verifySessionJwt(tampered)).toBeNull()
+    // Flip the FIRST character of the signature segment. (Not the last: a 256-bit
+    // HMAC base64url-encodes to 43 chars = 258 bits, so the final char carries 2
+    // slack bits that decoders ignore — flipping only those decodes to the SAME
+    // bytes and the "tampered" token still verifies. The first char is all real
+    // bits, so this change always breaks the HMAC.)
+    const [header, payload, sig] = token.split('.')
+    const flipped = (sig[0] === 'a' ? 'b' : 'a') + sig.slice(1)
+    expect(await verifySessionJwt(`${header}.${payload}.${flipped}`)).toBeNull()
   })
 
   it('returns null for an expired token', async () => {
