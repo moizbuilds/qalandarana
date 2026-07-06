@@ -94,7 +94,11 @@ export async function POST(request: Request): Promise<Response> {
     // is ≤~25MB — trivial to hold in memory. The tradeoff (memory vs. streaming)
     // only tips the other way for large files, which the duration cap forbids.
     const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
-    const blob = await put(`audio/${message.message_id}.ogg`, audioBuffer, { access: 'public' })
+    // Public-but-unguessable URL: this is the design's privacy model for the family's
+    // voice notes. A random suffix stops sequential/guessable pathnames (e.g. by
+    // message_id) from being enumerable; the DB stores whatever suffixed URL put()
+    // actually returns, so nothing needs to reconstruct the pathname later.
+    const blob = await put(`audio/${message.message_id}.ogg`, audioBuffer, { access: 'public', addRandomSuffix: true })
 
     const entry = await createEntry({
       audioUrl: blob.url,

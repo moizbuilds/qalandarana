@@ -130,7 +130,7 @@ describe('POST /api/telegram/webhook', () => {
     // Blob stored at the deterministic per-message pathname.
     const [pathname, , opts] = put.mock.calls[0]
     expect(pathname).toBe('audio/5000.ogg')
-    expect(opts).toEqual({ access: 'public' })
+    expect(opts).toEqual({ access: 'public', addRandomSuffix: true })
     // Entry created with the blob URL and Telegram provenance.
     expect(createEntry).toHaveBeenCalledWith({
       audioUrl: 'https://blob.example/audio/5000.ogg',
