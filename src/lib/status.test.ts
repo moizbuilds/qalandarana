@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { assertTransition, stageForStatus, retryStatusFor } from './status'
+import { assertTransition, stageForStatus, retryStatusFor, STATUSES } from './status'
+import { entryStatusEnum } from './schema'
 
 describe('assertTransition', () => {
   it.each([
@@ -14,6 +15,14 @@ describe('assertTransition', () => {
     ['transcribed', 'published'], ['published', 'failed'],
   ] as const)('rejects %s → %s', (from, to) => {
     expect(() => assertTransition(from, to)).toThrowError(/Illegal/)
+  })
+})
+
+// Guards against the runtime rulebook (STATUSES) and the DB enum (entryStatusEnum)
+// silently drifting apart — they're two independent literal lists of the same values.
+describe('single source of truth', () => {
+  it('keeps entryStatusEnum in sync with STATUSES', () => {
+    expect(entryStatusEnum.enumValues).toEqual([...STATUSES])
   })
 })
 
