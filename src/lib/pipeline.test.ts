@@ -143,6 +143,32 @@ it('captures a stage failure: marks failed with stage + truncated message and no
   expect(status).toBe('failed')
 })
 
+it('structure stage: null rawTranscript fails loudly at structure without calling structureEntry', async () => {
+  getEntryById.mockResolvedValue(baseEntry({ status: 'transcribed', rawTranscript: null }))
+  transition.mockResolvedValue(baseEntry({ status: 'failed' }))
+
+  const status = await advanceEntry('entry-1')
+
+  expect(structureEntry).not.toHaveBeenCalled()
+  expect(transition).toHaveBeenCalledWith(
+    expect.anything(),
+    'failed',
+    { failedAtStage: 'structure', errorMessage: 'Cannot structure an entry with no transcript' },
+  )
+  expect(status).toBe('failed')
+})
+
+it('captures a stage failure: truncates an oversized error message to exactly MAX_ERROR_LENGTH chars', async () => {
+  getEntryById.mockResolvedValue(baseEntry({ status: 'received' }))
+  transcribe.mockRejectedValue(new Error('x'.repeat(600)))
+  transition.mockResolvedValue(baseEntry({ status: 'failed' }))
+
+  await advanceEntry('entry-1')
+
+  const patch = transition.mock.calls[0][2]
+  expect(patch.errorMessage).toHaveLength(500)
+})
+
 it('send_review: sends the review link FIRST, then transitions to in_review with the same token', async () => {
   getEntryById.mockResolvedValue(baseEntry({ status: 'structured', title: 'My Kalam' }))
   sendTelegramMessage.mockResolvedValue(undefined)
@@ -204,5 +230,10 @@ it('retryEntry: rewinds a failed(structure) entry to transcribed, clears failure
 
 it('retryEntry: throws when the entry is not in a failed state', async () => {
   getEntryById.mockResolvedValue(baseEntry({ status: 'structured' }))
+  await expect(retryEntry('entry-1')).rejects.toThrow()
+})
+
+it('retryEntry: throws when status is failed but failedAtStage is null', async () => {
+  getEntryById.mockResolvedValue(baseEntry({ status: 'failed', failedAtStage: null }))
   await expect(retryEntry('entry-1')).rejects.toThrow()
 })
