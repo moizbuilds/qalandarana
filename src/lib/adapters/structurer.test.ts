@@ -5,7 +5,7 @@
 // called, (b) the other is NOT, and (c) bad model output is rejected loudly by zod
 // rather than leaking undefined fields downstream.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { it, expect, vi, beforeEach } from 'vitest'
 import { applyValidEnv } from '../test-fixtures'
 import { _resetEnvCache } from '../env'
 
@@ -65,4 +65,16 @@ it('parses GOOD payload wrapped in ```json fences', async () => {
   anthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: fenced }] })
   const out = await structureEntry('raw')
   expect(out.title).toBe('Ki Jaana Main Kaun')
+})
+
+// Claude's extended thinking can emit a 'thinking' block before the 'text' block;
+// this guards the find-by-type behavior (must not assume text is content[0]).
+it('parses GOOD payload when a thinking block precedes the text block', async () => {
+  process.env.STRUCTURER_PROVIDER = 'claude'
+  _resetEnvCache()
+  anthropicCreate.mockResolvedValue({
+    content: [{ type: 'thinking', thinking: '...' }, { type: 'text', text: JSON.stringify(GOOD) }],
+  })
+  const out = await structureEntry('raw')
+  expect(out.poet_name).toBe('Bulleh Shah')
 })
