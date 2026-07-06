@@ -24,6 +24,9 @@ import { getEntryById } from '@/lib/entries'
 // 404 on anything that isn't a uuid, so a garbage id can never reach the query.
 const idSchema = z.string().uuid()
 
+// Next prerenders pages at build time by default; this one must read the DB per-request.
+export const dynamic = 'force-dynamic'
+
 export default async function EntryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!idSchema.safeParse(id).success) notFound()

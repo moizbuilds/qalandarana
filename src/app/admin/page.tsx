@@ -34,6 +34,9 @@ function formatCreated(date: Date): string {
   })
 }
 
+// Next prerenders pages at build time by default; this one must read the DB per-request.
+export const dynamic = 'force-dynamic'
+
 export default async function AdminDashboardPage() {
   const entries = await listEntries()
 

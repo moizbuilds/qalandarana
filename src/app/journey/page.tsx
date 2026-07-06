@@ -20,6 +20,9 @@ import type { Entry } from '@/lib/schema'
 // A published maqam row can carry no entries; we still want to show the valley
 // with a quiet placeholder, so the render loop tolerates an empty list.
 
+// Next prerenders pages at build time by default; this one must read the DB per-request.
+export const dynamic = 'force-dynamic'
+
 export default async function JourneyPage() {
   // Three reads, fired together — they don't depend on each other, so we await
   // them as one Promise.all rather than one-after-another (fewer round trips).

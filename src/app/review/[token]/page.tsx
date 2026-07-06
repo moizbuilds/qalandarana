@@ -14,6 +14,9 @@ import { notFound } from 'next/navigation'
 import { getEntryByReviewToken } from '@/lib/entries'
 import { approveEntry, flagEntry } from './actions'
 
+// Next prerenders pages at build time by default; this one must read the DB per-request.
+export const dynamic = 'force-dynamic'
+
 export default async function ReviewPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const entry = await getEntryByReviewToken(token)
