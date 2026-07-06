@@ -107,11 +107,20 @@ export async function POST(request: Request): Promise<Response> {
       telegramChatId: message.chat.id,
     })
 
-    await sendTelegramMessage(message.chat.id, 'Got it 🌙 processing…')
-
-    // Kick the pipeline in a background invocation. waitUntil keeps the function
-    // alive for the fetch without making THIS response wait on the pipeline.
+    // Kick the pipeline FIRST, before the ack. The entry is committed and the
+    // pipeline is what actually matters; the "Got it" reply is a nicety. waitUntil
+    // keeps the function alive for the fetch without making THIS response wait.
     waitUntil(triggerAdvance(entry.id))
+
+    // The ack gets its own try/catch: the entry is committed and the pipeline is
+    // already kicked, so a failed ack must NOT resurface as a webhook error —
+    // that would 500, and dedup would then block Telegram's re-forward of a note
+    // we already stored. Record it out-of-band and still return 200.
+    try {
+      await sendTelegramMessage(message.chat.id, 'Got it 🌙 processing…')
+    } catch (ackErr) {
+      await notifyAdmin(`Qalandarana: ack failed for entry ${entry.id}: ${String(ackErr)}`)
+    }
 
     return new Response(null, { status: 200 })
   } catch (err) {

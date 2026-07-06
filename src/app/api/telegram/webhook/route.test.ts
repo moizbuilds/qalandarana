@@ -153,6 +153,32 @@ describe('POST /api/telegram/webhook', () => {
     expect(JSON.parse(advanceInit.body)).toEqual({ entryId: 'entry-new' })
   })
 
+  it('kicks the pipeline BEFORE acking, and a failed ack → notifyAdmin, still 200', async () => {
+    // The entry is committed and the pipeline kicked by the time we ack. If the
+    // ack then fails it must NOT fall into the outer catch (that path reads as a
+    // webhook error and, on a Telegram redelivery, dedup would block reprocessing
+    // a note we already stored). Instead: notifyAdmin out-of-band, still 200.
+    getEntryByTelegramMessageId.mockResolvedValue(undefined)
+    getTelegramFileUrl.mockResolvedValue('https://api.telegram.org/file/bottok/voice/f.oga')
+    put.mockResolvedValue({ url: 'https://blob.example/audio/5001.ogg' })
+    createEntry.mockResolvedValue({ id: 'entry-ack-fail' })
+    sendTelegramMessage.mockRejectedValue(new Error('telegram sendMessage down'))
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url.includes('/api/pipeline/advance')
+        ? new Response(JSON.stringify({ status: 'transcribed' }), { status: 200 })
+        : new Response(new Uint8Array([1, 2, 3, 4]), { status: 200 })))
+
+    const res = await POST(webhookRequest(voiceUpdate({ message_id: 5001 })))
+
+    expect(res.status).toBe(200)
+    // Kick happened before the ack attempt — the pipeline is never hostage to the nicety.
+    expect(waitUntil).toHaveBeenCalledOnce()
+    expect(waitUntil.mock.invocationCallOrder[0])
+      .toBeLessThan(sendTelegramMessage.mock.invocationCallOrder[0])
+    // The ack failure surfaced to the admin, not as a webhook error.
+    expect(notifyAdmin).toHaveBeenCalledWith(expect.stringContaining('ack failed for entry entry-ack-fail'))
+  })
+
   it('swallows an internal error after auth: 200 + notifyAdmin, no crash', async () => {
     getEntryByTelegramMessageId.mockResolvedValue(undefined)
     getTelegramFileUrl.mockRejectedValue(new Error('telegram getFile down'))

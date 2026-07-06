@@ -13,15 +13,29 @@
 // on it." That is how one stage triggers the next in a SEPARATE invocation
 // without blocking the HTTP reply — fire-and-forget, but not dropped.
 import { getEnv } from './env'
+import { notifyAdmin } from './telegram'
 
 // Build and send the advance request for an entry. Fire-and-forget: the caller
 // wraps the returned promise in waitUntil so a slow/failed next stage never
 // delays or fails the current response.
-export function triggerAdvance(entryId: string): Promise<Response> {
+//
+// CONCEPT: this runs INSIDE waitUntil, so it must NEVER throw — a rejected
+// waitUntil promise is swallowed silently, which is exactly how a broken pipeline
+// kick (a 401 from a rotated secret, a network blip) would vanish with no trace.
+// So we check res.ok and catch fetch rejection ourselves, and surface either as a
+// notifyAdmin message. The pipeline kick is best-effort but never silent.
+export async function triggerAdvance(entryId: string): Promise<void> {
   const { APP_URL, INTERNAL_API_SECRET } = getEnv()
-  return fetch(`${APP_URL}/api/pipeline/advance`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-internal-secret': INTERNAL_API_SECRET },
-    body: JSON.stringify({ entryId }),
-  })
+  try {
+    const res = await fetch(`${APP_URL}/api/pipeline/advance`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-internal-secret': INTERNAL_API_SECRET },
+      body: JSON.stringify({ entryId }),
+    })
+    if (!res.ok) {
+      await notifyAdmin(`Qalandarana: pipeline kick failed for entry ${entryId}: ${res.status}`)
+    }
+  } catch (err) {
+    await notifyAdmin(`Qalandarana: pipeline kick failed for entry ${entryId}: ${String(err)}`)
+  }
 }

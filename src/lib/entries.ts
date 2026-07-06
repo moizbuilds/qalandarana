@@ -13,7 +13,7 @@
 // The naive alternative — scattering `db.select`/`db.update` calls across every
 // route and stage — means the same guard has to be remembered in a dozen places,
 // and the day someone forgets is the day the pipeline breaks.
-import { eq, desc } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import { db } from './db'
 import { entries, type Entry, type NewEntry } from './schema'
 import { assertTransition, type EntryStatus } from './status'
@@ -59,10 +59,20 @@ export async function getEntryByTelegramMessageId(id: number): Promise<Entry | u
 // status in the same update (e.g. rawTranscript when moving to 'transcribed').
 export async function transition(entry: Entry, to: EntryStatus, patch: Partial<NewEntry> = {}): Promise<Entry> {
   assertTransition(entry.status as EntryStatus, to)
+  // CONCEPT: compare-and-swap (CAS). assertTransition() checks a SNAPSHOT — the
+  // status on the `entry` object we were handed, which may be stale by the time
+  // this write runs (two requests can rewind/advance the same entry at once).
+  // Adding `eq(entries.status, entry.status)` to the WHERE makes the update
+  // atomic: it only matches while the row is STILL at the status we validated
+  // against. If a concurrent write already moved it, .returning() is empty and we
+  // throw rather than silently applying a transition the rulebook never approved.
   const [updated] = await db.update(entries)
     .set({ ...patch, status: to })
-    .where(eq(entries.id, entry.id))
+    .where(and(eq(entries.id, entry.id), eq(entries.status, entry.status)))
     .returning()
+  if (!updated) {
+    throw new Error(`Concurrent modification: entry ${entry.id} is no longer ${entry.status}`)
+  }
   return updated
 }
 
