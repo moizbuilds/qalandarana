@@ -79,7 +79,7 @@ Run it once per secret and assign the output to:
 
 Also pick a value for `FAMILY_PASSPHRASE` (the shared word your family types to
 enter — any memorable phrase) and `STRUCTURER_PROVIDER` (start with `claude`;
-you'll confirm this in Step 11).
+you'll confirm this in Step 12).
 
 ---
 
@@ -98,7 +98,26 @@ password at `/admin/login`; the app compares it against this hash.
 
 ---
 
-## 6. Fill in `.env.local`
+## 6. Get the LLM API keys → `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
+
+Both are **paid** APIs (checklist #5) — set a monthly spend cap in each
+console so a runaway loop can't surprise you on the bill.
+
+1. **OpenAI** — at **platform.openai.com/api-keys**, create a key. This powers
+   **Whisper transcription** (turning the voice note's audio into text) and is
+   needed **always**, regardless of which structurer you end up using. Copy it
+   as `OPENAI_API_KEY`.
+2. **Anthropic** — at **console.anthropic.com/settings/keys**, create a key.
+   This powers the **structurer** (turning raw transcript into a structured
+   entry) whenever `STRUCTURER_PROVIDER=claude` — the default, and the one
+   you'll confirm in Step 12. Copy it as `ANTHROPIC_API_KEY`.
+3. In each console, set a **monthly spend limit** (or usage alert) before you
+   forget — both keys can be called repeatedly by the pipeline, so a bug that
+   loops shouldn't be able to run up an unbounded bill.
+
+---
+
+## 7. Fill in `.env.local`
 
 `.env.local` is the gitignored file holding your real secrets. It mirrors the
 committed template `.env.example`. Create it by copying the template:
@@ -107,15 +126,16 @@ committed template `.env.example`. Create it by copying the template:
 cp .env.example .env.local
 ```
 
-Then open `.env.local` and paste in every value from Steps 1–5. For **local**
-work leave `APP_URL=http://localhost:3000`; you'll change it to the Vercel URL in
-Step 9. `PUBLIC_MODE` stays `false` (the passphrase gate is Phase 2). Every var is
+Then open `.env.local` and paste in every value from Steps 1–6, including
+`OPENAI_API_KEY` and `ANTHROPIC_API_KEY`. For **local** work leave
+`APP_URL=http://localhost:3000`; you'll change it to the Vercel URL in Step 10.
+`PUBLIC_MODE` stays `false` (the passphrase gate is Phase 2). Every var is
 **required** — the app refuses to start if any is missing (`src/lib/env.ts` fails
 closed), so a blank here becomes a loud, early error rather than a mystery crash.
 
 ---
 
-## 7. Create the tables and seed reference data
+## 8. Create the tables and seed reference data
 
 ```bash
 npm run db:migrate   # creates the tables in your Neon database
@@ -126,7 +146,7 @@ npm run db:seed      # inserts the 7 maqamat, 6 poets, and your 1 admin account
 
 ---
 
-## 8. Local smoke test
+## 9. Local smoke test
 
 ```bash
 npm run dev
@@ -138,7 +158,7 @@ order (each empty for now). Visit **/admin/login** and sign in with `ADMIN_EMAIL
 
 ---
 
-## 9. Deploy to Vercel
+## 10. Deploy to Vercel
 
 The webhook needs a **public** URL, so the app must be deployed before Telegram
 can reach it.
@@ -157,9 +177,9 @@ can reach it.
    **Environment Variables**, add the same keys/values as `.env.local`, with two
    changes:
    - `APP_URL` = your production URL (e.g. `https://qalandarana.vercel.app`).
-   - `BLOB_READ_WRITE_TOKEN` = the value from step 9.2.
+   - `BLOB_READ_WRITE_TOKEN` = the value from step 10.2.
 
-   Set `DATABASE_URL` to the **same** Neon database you migrated in Step 7 (or run
+   Set `DATABASE_URL` to the **same** Neon database you migrated in Step 8 (or run
    `db:migrate`/`db:seed` again against whatever DB production points at).
 
 4. Deploy:
@@ -173,7 +193,7 @@ can reach it.
 
 ---
 
-## 10. Register the webhook
+## 11. Register the webhook
 
 Point Telegram at your deployed webhook so it starts delivering voice notes:
 
@@ -189,14 +209,14 @@ Check that:
 - `getWebhookInfo` shows your `url` and an **empty** `last_error_message`.
 
 The script **refuses to run if `APP_URL` is localhost** — webhooks need a public
-URL, so this catches the easy mistake of forgetting Step 9.5.
+URL, so this catches the easy mistake of forgetting Step 10.5.
 
 Now forward a voice note to the bot and watch it flow. Failure alerts (if any)
 arrive in your Telegram from the bot.
 
 ---
 
-## 11. The taste test — pick the structurer
+## 12. The taste test — pick the structurer
 
 Two LLMs (Claude and GPT) can turn a raw transcript into a structured entry. Run
 the **same real transcript** through both and let your father judge which reads
@@ -255,7 +275,7 @@ and needs a **real database**. It reads `DATABASE_URL` from `.env.local`.
 # once: install the browser Playwright drives
 npx playwright install chromium
 
-# then, with .env.local filled and the DB migrated + seeded (Step 7):
+# then, with .env.local filled and the DB migrated + seeded (Step 8):
 npm run e2e
 ```
 

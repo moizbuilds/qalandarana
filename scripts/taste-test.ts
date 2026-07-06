@@ -59,36 +59,54 @@ function parseStructured(raw: string) {
 
 // Run ONE provider and print its labeled block. Wrapped so a thrown error (API
 // down, bad JSON, zod mismatch) is caught and printed for THIS provider only —
-// one provider failing must never hide the other's output. Returns nothing; all
-// results go to stdout for a human to read side by side.
-async function runProvider(label: string, model: string, call: (raw: string) => Promise<string>, transcript: string): Promise<void> {
+// one provider failing must never hide the other's output. Returns whether this
+// provider succeeded, so the caller can decide the process exit code.
+async function runProvider(label: string, model: string, call: (raw: string) => Promise<string>, transcript: string): Promise<boolean> {
   console.log(`\n${'='.repeat(70)}`)
   console.log(`  ${label}  (${model})`)
   console.log('='.repeat(70))
   try {
     const structured = parseStructured(await call(transcript))
     console.log(JSON.stringify(structured, null, 2))
+    return true
   } catch (err) {
     console.error(`  ${label} FAILED:`, err instanceof Error ? err.message : err)
+    return false
   }
 }
 
-async function main() {
+async function main(): Promise<boolean> {
   const { file, provider } = parseArgs(process.argv.slice(2))
   const transcript = readFileSync(file, 'utf8').trim()
   if (!transcript) throw new Error(`Transcript file is empty: ${file}`)
 
   console.log(`Taste test on: ${file}  (${transcript.length} chars)`)
 
+  // Track per-provider success so a run where EVERY attempted provider fails
+  // can exit non-zero (a CI/script caller relying on the exit code shouldn't
+  // see "success" when there's no usable output). One provider failing must
+  // still never hide the other's output — that isolation stays in runProvider.
+  const results: boolean[] = []
+
   // Providers run sequentially, not in parallel: the output is meant to be read
   // top-to-bottom by a person, and one failing shouldn't abort the other. Order
   // matters less than legibility here.
   if (provider === 'both' || provider === 'claude') {
-    await runProvider('CLAUDE', CLAUDE_MODEL, viaClaude, transcript)
+    results.push(await runProvider('CLAUDE', CLAUDE_MODEL, viaClaude, transcript))
   }
   if (provider === 'both' || provider === 'openai') {
-    await runProvider('OPENAI', OPENAI_MODEL, viaOpenAI, transcript)
+    results.push(await runProvider('OPENAI', OPENAI_MODEL, viaOpenAI, transcript))
   }
+
+  return results.some((ok) => ok)
 }
 
-main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1) })
+main()
+  .then((anySucceeded) => {
+    if (!anySucceeded) {
+      console.error('\nTaste test failed: every attempted provider errored — no output to compare.')
+      process.exit(1)
+    }
+    process.exit(0)
+  })
+  .catch((e) => { console.error(e); process.exit(1) })
