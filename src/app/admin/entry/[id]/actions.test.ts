@@ -1,5 +1,5 @@
-// Tests for the admin detail-page server actions — the four buttons/forms Moiz
-// uses to fix, retry, resend, and force-publish an entry from the workbench.
+// Tests for the admin detail-page server actions — the buttons/forms Moiz uses
+// to fix, retry, advance, resend, and force-publish an entry from the workbench.
 //
 // These actions are the ONLY writers the admin detail page reaches, and every
 // one of them mutates real data (edits fields, rewinds the pipeline, publishes).
@@ -18,13 +18,16 @@ import type { Entry } from '@/lib/schema'
 // hoists vi.mock to the top of the file), so we create them up here.
 const {
   requireAdmin, getEntryById, updateEntryFields, transition,
-  retryEntry, sendTelegramMessage, getEnv, revalidatePath,
+  rewindFailedEntry, triggerAdvance, waitUntil,
+  sendTelegramMessage, getEnv, revalidatePath,
 } = vi.hoisted(() => ({
   requireAdmin: vi.fn(),
   getEntryById: vi.fn(),
   updateEntryFields: vi.fn(),
   transition: vi.fn(),
-  retryEntry: vi.fn(),
+  rewindFailedEntry: vi.fn(),
+  triggerAdvance: vi.fn(),
+  waitUntil: vi.fn(),
   sendTelegramMessage: vi.fn(),
   getEnv: vi.fn(),
   revalidatePath: vi.fn(),
@@ -32,12 +35,14 @@ const {
 
 vi.mock('@/lib/require-admin', () => ({ requireAdmin }))
 vi.mock('@/lib/entries', () => ({ getEntryById, updateEntryFields, transition }))
-vi.mock('@/lib/pipeline', () => ({ retryEntry }))
+vi.mock('@/lib/pipeline', () => ({ rewindFailedEntry }))
+vi.mock('@/lib/advance-call', () => ({ triggerAdvance }))
+vi.mock('@vercel/functions', () => ({ waitUntil }))
 vi.mock('@/lib/telegram', () => ({ sendTelegramMessage }))
 vi.mock('@/lib/env', () => ({ getEnv }))
 vi.mock('next/cache', () => ({ revalidatePath }))
 
-import { saveEntry, retryAction, resendReviewAction, publishNowAction } from './actions'
+import { saveEntry, retryAction, advanceAction, resendReviewAction, publishNowAction } from './actions'
 
 const ID = 'e1'
 
@@ -110,27 +115,89 @@ describe('saveEntry', () => {
 })
 
 describe('retryAction', () => {
-  it('retries a failed entry', async () => {
+  it('rewinds a failed entry, then kicks the advance route via waitUntil (no in-process stage run)', async () => {
     getEntryById.mockResolvedValue(entryWith({ status: 'failed' }))
+    rewindFailedEntry.mockResolvedValue(entryWith({ status: 'transcribed' }))
+    const kickPromise = Promise.resolve()
+    triggerAdvance.mockReturnValue(kickPromise)
 
     await retryAction(ID)
 
-    expect(retryEntry).toHaveBeenCalledWith(ID)
+    expect(rewindFailedEntry).toHaveBeenCalledWith(ID)
+    // The re-run is handed to the advance ROUTE (which owns the 300s budget and
+    // chains stages to completion) as a background kick — never run in-process.
+    expect(triggerAdvance).toHaveBeenCalledWith(ID)
+    expect(waitUntil).toHaveBeenCalledWith(kickPromise)
+    // Rewind must complete before the kick, or the route would advance the stale row.
+    expect(rewindFailedEntry.mock.invocationCallOrder[0])
+      .toBeLessThan(triggerAdvance.mock.invocationCallOrder[0])
     expect(revalidatePath).toHaveBeenCalledWith('/admin/entry/' + ID)
   })
 
-  it('throws and does NOT retry when the entry is not failed', async () => {
+  it('throws and does NOT rewind or kick when the entry is not failed', async () => {
     getEntryById.mockResolvedValue(entryWith({ status: 'in_review' }))
 
     await expect(retryAction(ID)).rejects.toThrow()
-    expect(retryEntry).not.toHaveBeenCalled()
+    expect(rewindFailedEntry).not.toHaveBeenCalled()
+    expect(triggerAdvance).not.toHaveBeenCalled()
   })
 
   it('throws when the entry does not exist', async () => {
     getEntryById.mockResolvedValue(undefined)
 
     await expect(retryAction(ID)).rejects.toThrow()
-    expect(retryEntry).not.toHaveBeenCalled()
+    expect(rewindFailedEntry).not.toHaveBeenCalled()
+    expect(triggerAdvance).not.toHaveBeenCalled()
+  })
+
+  it('rejects when requireAdmin throws — no rewind, no kick', async () => {
+    requireAdmin.mockRejectedValue(new Error('Unauthorized'))
+
+    await expect(retryAction(ID)).rejects.toThrow('Unauthorized')
+    expect(rewindFailedEntry).not.toHaveBeenCalled()
+    expect(triggerAdvance).not.toHaveBeenCalled()
+  })
+})
+
+describe('advanceAction', () => {
+  it.each(['received', 'transcribed', 'structured'] as const)(
+    'kicks the advance route for a %s entry',
+    async (status) => {
+      getEntryById.mockResolvedValue(entryWith({ status }))
+      const kickPromise = Promise.resolve()
+      triggerAdvance.mockReturnValue(kickPromise)
+
+      await advanceAction(ID)
+
+      expect(triggerAdvance).toHaveBeenCalledWith(ID)
+      expect(waitUntil).toHaveBeenCalledWith(kickPromise)
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/entry/' + ID)
+    },
+  )
+
+  it.each(['in_review', 'needs_fix', 'published', 'failed'] as const)(
+    'throws and does NOT kick for a %s entry (not mid-pipeline)',
+    async (status) => {
+      getEntryById.mockResolvedValue(entryWith({ status }))
+
+      await expect(advanceAction(ID)).rejects.toThrow()
+      expect(triggerAdvance).not.toHaveBeenCalled()
+    },
+  )
+
+  it('throws when the entry does not exist', async () => {
+    getEntryById.mockResolvedValue(undefined)
+
+    await expect(advanceAction(ID)).rejects.toThrow()
+    expect(triggerAdvance).not.toHaveBeenCalled()
+  })
+
+  it('rejects when requireAdmin throws — no kick', async () => {
+    requireAdmin.mockRejectedValue(new Error('Unauthorized'))
+
+    await expect(advanceAction(ID)).rejects.toThrow('Unauthorized')
+    expect(getEntryById).not.toHaveBeenCalled()
+    expect(triggerAdvance).not.toHaveBeenCalled()
   })
 })
 

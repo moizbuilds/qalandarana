@@ -4,8 +4,8 @@
 // A voice note travels received → transcribed → structured → in_review, one
 // stage per HTTP call. `advanceEntry` looks at where an entry currently is,
 // runs exactly the next stage, and returns the new status. Routes (Task 10)
-// call `advanceEntry`; the admin dashboard (Task 14) calls `retryEntry` to
-// rewind a stuck entry and try again.
+// call `advanceEntry`; the admin dashboard (Task 14) calls `rewindFailedEntry`
+// to reset a stuck entry, then re-kicks the advance route to re-run from there.
 //
 // CONCEPT: "failure is data, not an exception." When a stage throws, we don't
 // let the error bubble out to the route (which would 500 and lose the reason).
@@ -53,13 +53,20 @@ export async function advanceEntry(entryId: string): Promise<EntryStatus> {
   }
 }
 
-// Retry a failed entry: rewind to the stage's INPUT status (clearing the failure
-// fields in the same write), then re-run the pipeline from there.
+// Rewind a failed entry to the failed stage's INPUT status (clearing the failure
+// fields in the same write) and return the updated row. It does NOT re-run the
+// stage — that is the advance ROUTE's job.
+//
+// WHY split rewind from advance: a stage can run Whisper for minutes. A server
+// action calling advanceEntry in-process would run that ONE stage inside the
+// action's own (short) budget and then stop, stranding the entry one stage on.
+// Instead the caller rewinds here, then hands the entry to triggerAdvance so the
+// advance route chains every remaining stage to completion under its 300s budget.
 //
 // Rewinding to the input, not the failed stage itself, is what makes retry
 // correct: a structure failure rewinds to 'transcribed' (the transcript is still
 // good), so re-running re-does only the structure step, not the transcription.
-export async function retryEntry(entryId: string): Promise<EntryStatus> {
+export async function rewindFailedEntry(entryId: string): Promise<Entry> {
   const entry = await getEntryById(entryId)
   if (!entry) throw new Error(`Entry not found: ${entryId}`)
   if (entry.status !== 'failed' || !entry.failedAtStage) {
@@ -68,11 +75,10 @@ export async function retryEntry(entryId: string): Promise<EntryStatus> {
 
   // Clearing errorMessage + failedAtStage here (not in a later write) keeps the
   // rewind atomic: an entry is never "not failed but still carrying a failure".
-  await transition(entry, retryStatusFor(entry.failedAtStage as Stage), {
+  return transition(entry, retryStatusFor(entry.failedAtStage as Stage), {
     errorMessage: null,
     failedAtStage: null,
   })
-  return advanceEntry(entryId)
 }
 
 // The three stages. Each does its work, then calls transition() — the single

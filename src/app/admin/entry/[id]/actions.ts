@@ -12,12 +12,18 @@
 //      status, so the pipeline's rulebook can't be jumped by a stray button.
 'use server'
 
+import { waitUntil } from '@vercel/functions'
 import { revalidatePath } from 'next/cache'
 import { getEntryById, updateEntryFields, transition } from '@/lib/entries'
-import { retryEntry } from '@/lib/pipeline'
+import { rewindFailedEntry } from '@/lib/pipeline'
+import { triggerAdvance } from '@/lib/advance-call'
 import { sendTelegramMessage } from '@/lib/telegram'
 import { requireAdmin } from '@/lib/require-admin'
 import { buildReviewMessage } from '@/lib/review-message'
+
+// The mid-pipeline statuses whose entry has a next stage but no other button —
+// the "Advance pipeline" button re-kicks the advance route for these.
+const ADVANCEABLE_STATUSES = ['received', 'transcribed', 'structured'] as const
 
 // The ONLY entry fields the admin form may write. Everything else — status,
 // audioUrl, rawTranscript, the identity/provenance columns — is either owned by
@@ -54,10 +60,14 @@ export async function saveEntry(id: string, formData: FormData): Promise<void> {
   revalidatePath('/admin/entry/' + id)
 }
 
-// Retry a failed entry: only legal from status 'failed' (retryEntry itself also
-// re-checks, but we guard here so a wrong-status click fails fast and loud rather
-// than reaching the pipeline). retryEntry rewinds to the failed stage's input and
-// re-runs from there.
+// Retry a failed entry: rewind to the failed stage's input, then kick the advance
+// route to re-run from there. rewindFailedEntry re-checks the 'failed' guard, but
+// we guard here too so a wrong-status click fails fast (defense in depth).
+//
+// WHY rewind-then-kick, not run-in-process: a stage (Whisper) can take minutes.
+// The advance ROUTE owns the 300s budget and chains stage→stage to completion; a
+// server action must never run a stage itself. So we rewind the DB state here and
+// hand the re-run to triggerAdvance via waitUntil (fire-and-forget background kick).
 export async function retryAction(id: string): Promise<void> {
   await requireAdmin()
 
@@ -66,7 +76,25 @@ export async function retryAction(id: string): Promise<void> {
     throw new Error(`Cannot retry entry ${id}: it is not in a failed state`)
   }
 
-  await retryEntry(id)
+  await rewindFailedEntry(id)
+  waitUntil(triggerAdvance(id))
+  revalidatePath('/admin/entry/' + id)
+}
+
+// Advance a mid-pipeline entry: for entries stuck at received/transcribed/
+// structured (a stage that never got kicked, e.g. a dropped waitUntil), re-kick
+// the advance route to drive them the rest of the way. This retires the whole
+// "stranded mid-pipeline with no button" class. No in-process stage runs here —
+// same reason as retryAction: the route owns the budget and chains to completion.
+export async function advanceAction(id: string): Promise<void> {
+  await requireAdmin()
+
+  const entry = await getEntryById(id)
+  if (!entry || !ADVANCEABLE_STATUSES.includes(entry.status as (typeof ADVANCEABLE_STATUSES)[number])) {
+    throw new Error(`Cannot advance entry ${id}: it is not mid-pipeline`)
+  }
+
+  waitUntil(triggerAdvance(id))
   revalidatePath('/admin/entry/' + id)
 }
 

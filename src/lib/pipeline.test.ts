@@ -35,7 +35,7 @@ vi.mock('./db', () => ({
   db: { select: () => ({ from: () => ({ where: () => ({ limit: dbSelectLimit }) }) }) },
 }))
 
-import { advanceEntry, retryEntry } from './pipeline'
+import { advanceEntry, rewindFailedEntry } from './pipeline'
 
 // A minimal entry row; each test overrides just the fields it cares about.
 const baseEntry = (over: Record<string, unknown> = {}) => ({
@@ -205,35 +205,51 @@ it('send_review: a Telegram send failure leaves the entry retryable (failed at s
   expect(status).toBe('failed')
 })
 
-it('retryEntry: rewinds a failed(structure) entry to transcribed, clears failure fields, and re-runs', async () => {
+it('rewindFailedEntry: rewinds a failed(structure) entry to transcribed, clears failure fields, and does NOT run the stage', async () => {
   const failed = baseEntry({ status: 'failed', failedAtStage: 'structure' })
   const rewound = baseEntry({ status: 'transcribed', rawTranscript: 'raw' })
-  // First load = inside retryEntry (failed row); second load = inside advanceEntry (rewound row).
-  getEntryById.mockResolvedValueOnce(failed).mockResolvedValueOnce(rewound)
-  transition
-    .mockResolvedValueOnce(rewound)                          // the rewind transition
-    .mockResolvedValueOnce(baseEntry({ status: 'structured' })) // the structure stage transition
-  structureEntry.mockResolvedValue(validStructured)
-  dbSelectLimit.mockResolvedValue([{ id: 'x' }])
+  getEntryById.mockResolvedValue(failed)
+  transition.mockResolvedValue(rewound)
 
-  const status = await retryEntry('entry-1')
+  const entry = await rewindFailedEntry('entry-1')
 
   expect(transition).toHaveBeenCalledWith(
     expect.objectContaining({ status: 'failed' }),
     'transcribed',
     { errorMessage: null, failedAtStage: null },
   )
-  // Proof the pipeline actually re-ran the structure stage after the rewind.
-  expect(structureEntry).toHaveBeenCalledWith('raw')
-  expect(status).toBe('structured')
+  // The rewind returns the row at the rewound status. Re-running the stage is the
+  // advance ROUTE's job (the caller kicks it via triggerAdvance) — never in-process.
+  expect(entry.status).toBe('transcribed')
+  expect(structureEntry).not.toHaveBeenCalled()
+  expect(transcribe).not.toHaveBeenCalled()
 })
 
-it('retryEntry: throws when the entry is not in a failed state', async () => {
+it('rewindFailedEntry: a failed(transcribe) entry rewinds to received', async () => {
+  getEntryById.mockResolvedValue(baseEntry({ status: 'failed', failedAtStage: 'transcribe' }))
+  transition.mockResolvedValue(baseEntry({ status: 'received' }))
+
+  const entry = await rewindFailedEntry('entry-1')
+
+  expect(transition).toHaveBeenCalledWith(
+    expect.anything(), 'received', { errorMessage: null, failedAtStage: null },
+  )
+  expect(entry.status).toBe('received')
+})
+
+it('rewindFailedEntry: throws when the entry is not in a failed state', async () => {
   getEntryById.mockResolvedValue(baseEntry({ status: 'structured' }))
-  await expect(retryEntry('entry-1')).rejects.toThrow()
+  await expect(rewindFailedEntry('entry-1')).rejects.toThrow()
+  expect(transition).not.toHaveBeenCalled()
 })
 
-it('retryEntry: throws when status is failed but failedAtStage is null', async () => {
+it('rewindFailedEntry: throws when status is failed but failedAtStage is null', async () => {
   getEntryById.mockResolvedValue(baseEntry({ status: 'failed', failedAtStage: null }))
-  await expect(retryEntry('entry-1')).rejects.toThrow()
+  await expect(rewindFailedEntry('entry-1')).rejects.toThrow()
+  expect(transition).not.toHaveBeenCalled()
+})
+
+it('rewindFailedEntry: throws when the entry does not exist', async () => {
+  getEntryById.mockResolvedValue(undefined)
+  await expect(rewindFailedEntry('missing')).rejects.toThrow()
 })
