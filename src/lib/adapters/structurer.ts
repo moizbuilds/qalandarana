@@ -16,8 +16,10 @@ import { SYSTEM_PROMPT } from './structurer-prompt'
 
 // Model IDs as named constants: the taste test edits these in one place, and it's
 // obvious what to re-check. verify current IDs at deploy time (Task 15).
-const CLAUDE_MODEL = 'claude-sonnet-4-5'
-const OPENAI_MODEL = 'gpt-5'
+// Exported so scripts/taste-test.ts can print exactly which model produced each
+// block — one source of truth for the model name here and in the taste-test header.
+export const CLAUDE_MODEL = 'claude-sonnet-4-5'
+export const OPENAI_MODEL = 'gpt-5'
 
 // CONCEPT: zod schema = one source of truth for both the runtime shape check AND
 // the TypeScript type (via z.infer). The pipeline and DB layer import this type,

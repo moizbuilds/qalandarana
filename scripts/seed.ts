@@ -44,4 +44,8 @@ async function main() {
     .onConflictDoUpdate({ target: admins.email, set: { passwordHash: env.ADMIN_PASSWORD_HASH } })
   console.log('Seeded: 7 maqamat, 6 poets, 1 admin')
 }
-main().then(() => process.exit(0))
+// .catch here is the review finding from Task 3: without it, if any insert
+// rejects, tsx would print an "unhandled promise rejection" and exit 0 — a
+// SILENT seed failure that looks like success. Catching it logs the real error
+// and exits non-zero, so a broken seed fails loudly (fail closed, checklist #4).
+main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1) })
