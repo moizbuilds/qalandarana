@@ -26,7 +26,10 @@ const EnvSchema = z.object({
   TELEGRAM_ALLOWED_USER_IDS: z.string().min(1)
     .transform((s) => s.split(',').map((id) => Number(id.trim())))
     .pipe(z.array(z.number().int().positive())),
-  TELEGRAM_ADMIN_CHAT_ID: z.string().min(1),
+  // A Telegram chat id: numeric, and negative for groups/channels (e.g. -1001234).
+  // The regex catches a fat-fingered non-numeric value at boot rather than letting
+  // it fail later inside a sendMessage call.
+  TELEGRAM_ADMIN_CHAT_ID: z.string().regex(/^-?\d+$/, 'must be a numeric Telegram chat id'),
   OPENAI_API_KEY: z.string().min(1),
   ANTHROPIC_API_KEY: z.string().min(1),
   STRUCTURER_PROVIDER: z.enum(['claude', 'openai']),

@@ -20,4 +20,12 @@ describe('getEnv', () => {
     Object.assign(process.env, VALID, { STRUCTURER_PROVIDER: 'gemini' })
     expect(() => getEnv()).toThrowError(/STRUCTURER_PROVIDER/)
   })
+  it('rejects a non-numeric TELEGRAM_ADMIN_CHAT_ID', () => {
+    Object.assign(process.env, VALID, { TELEGRAM_ADMIN_CHAT_ID: '@moizbuilds' })
+    expect(() => getEnv()).toThrowError(/TELEGRAM_ADMIN_CHAT_ID/)
+  })
+  it('accepts a negative TELEGRAM_ADMIN_CHAT_ID (group/channel ids are negative)', () => {
+    Object.assign(process.env, VALID, { TELEGRAM_ADMIN_CHAT_ID: '-1001234567890' })
+    expect(getEnv().TELEGRAM_ADMIN_CHAT_ID).toBe('-1001234567890')
+  })
 })

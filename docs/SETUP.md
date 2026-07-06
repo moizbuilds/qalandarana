@@ -133,6 +133,11 @@ Then open `.env.local` and paste in every value from Steps 1–6, including
 **required** — the app refuses to start if any is missing (`src/lib/env.ts` fails
 closed), so a blank here becomes a loud, early error rather than a mystery crash.
 
+> **Note:** leave `BLOB_READ_WRITE_TOKEN` as its placeholder for now — you'll get
+> the real value in Step 10 (Vercel/Blob). Validation only checks it's non-empty,
+> and nothing reads Blob until a real voice note arrives, so the placeholder lets
+> you run everything up to that point without blocking.
+
 ---
 
 ## 8. Create the tables and seed reference data
