@@ -17,7 +17,7 @@ import { getEntryById, updateEntryFields, transition } from '@/lib/entries'
 import { retryEntry } from '@/lib/pipeline'
 import { sendTelegramMessage } from '@/lib/telegram'
 import { requireAdmin } from '@/lib/require-admin'
-import { getEnv } from '@/lib/env'
+import { buildReviewMessage } from '@/lib/review-message'
 
 // The ONLY entry fields the admin form may write. Everything else — status,
 // audioUrl, rawTranscript, the identity/provenance columns — is either owned by
@@ -72,7 +72,14 @@ export async function retryAction(id: string): Promise<void> {
 
 // Resend the review link to father. Only legal from 'needs_fix' AND only when a
 // reviewToken already exists (we reuse the existing token so the link father gets
-// points at the same review). Moves needs_fix → in_review, then re-sends.
+// points at the same review).
+//
+// Order matters here, same as the pipeline's send_review stage (pipeline.ts):
+// SEND FIRST, then transition. If we transitioned to in_review first and the
+// send then threw, the button that lets Moiz retry (rendered only for
+// needs_fix) would vanish while father never got the link — the entry would be
+// stranded at in_review with no way back. Sending while still needs_fix means
+// a send failure just leaves the entry at needs_fix, Resend button intact.
 export async function resendReviewAction(id: string): Promise<void> {
   await requireAdmin()
 
@@ -81,10 +88,8 @@ export async function resendReviewAction(id: string): Promise<void> {
     throw new Error(`Cannot resend review for entry ${id}: not in needs_fix with a token`)
   }
 
+  await sendTelegramMessage(entry.telegramChatId, buildReviewMessage(entry.title, entry.reviewToken))
   await transition(entry, 'in_review')
-  const title = entry.title ?? 'Untitled'
-  const link = `${getEnv().APP_URL}/review/${entry.reviewToken}`
-  await sendTelegramMessage(entry.telegramChatId, `'${title}' is ready to review — ${link}`)
   revalidatePath('/admin/entry/' + id)
 }
 

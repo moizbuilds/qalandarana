@@ -167,7 +167,7 @@ describe('publishNowAction', () => {
 })
 
 describe('resendReviewAction', () => {
-  it('re-opens review and sends a Telegram message containing the existing token', async () => {
+  it('sends the Telegram message BEFORE transitioning, then re-opens review', async () => {
     getEntryById.mockResolvedValue(entryWith({
       status: 'needs_fix', reviewToken: 'tok-123', telegramChatId: 555, title: 'My Kalam',
     }))
@@ -180,7 +180,25 @@ describe('resendReviewAction', () => {
     const [chatId, text] = sendTelegramMessage.mock.calls[0]
     expect(chatId).toBe(555)
     expect(text).toContain('tok-123') // the existing token rides in the link
+    // Order matters (mirrors pipeline.ts's send_review stage): a send failure
+    // must leave the entry at needs_fix, not stranded at in_review, so send
+    // must happen strictly before transition.
+    expect(sendTelegramMessage.mock.invocationCallOrder[0])
+      .toBeLessThan(transition.mock.invocationCallOrder[0])
     expect(revalidatePath).toHaveBeenCalledWith('/admin/entry/' + ID)
+  })
+
+  it('a Telegram send failure leaves the entry retryable — no transition happens', async () => {
+    getEntryById.mockResolvedValue(entryWith({
+      status: 'needs_fix', reviewToken: 'tok-123', telegramChatId: 555, title: 'My Kalam',
+    }))
+    sendTelegramMessage.mockRejectedValue(new Error('telegram down'))
+
+    await expect(resendReviewAction(ID)).rejects.toThrow('telegram down')
+
+    expect(sendTelegramMessage).toHaveBeenCalledOnce()
+    expect(transition).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   it('throws when the entry is not needs_fix', async () => {

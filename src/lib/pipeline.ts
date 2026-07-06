@@ -21,7 +21,7 @@ import { stageForStatus, retryStatusFor, type EntryStatus, type Stage } from './
 import { transcribe } from './adapters/transcriber'
 import { structureEntry } from './adapters/structurer'
 import { sendTelegramMessage, notifyAdmin } from './telegram'
-import { getEnv } from './env'
+import { buildReviewMessage } from './review-message'
 
 // Postgres columns are text and forgiving; error messages can be huge stack
 // dumps. Cap what we persist so a runaway message can't bloat a row.
@@ -118,9 +118,7 @@ async function runStage(entry: Entry, stage: Stage): Promise<Entry> {
       // to 'structured'. The token is generated up front so the exact link we
       // send is the exact token we store.
       const reviewToken = crypto.randomUUID()
-      const title = entry.title ?? 'Untitled'
-      const link = `${getEnv().APP_URL}/review/${reviewToken}`
-      await sendTelegramMessage(entry.telegramChatId, `'${title}' is ready to review — ${link}`)
+      await sendTelegramMessage(entry.telegramChatId, buildReviewMessage(entry.title, reviewToken))
       return transition(entry, 'in_review', { reviewToken })
     }
   }
