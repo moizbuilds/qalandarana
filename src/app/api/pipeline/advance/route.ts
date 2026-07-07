@@ -19,10 +19,11 @@ import { notifyAdmin } from '@/lib/telegram'
 import { triggerAdvance } from '@/lib/advance-call'
 
 // CONCEPT: maxDuration is a Vercel route-segment knob capping how long this
-// function may run (seconds). Whisper on a 25-minute note can take minutes, so we
-// ask for 300s. NOTE: 300 requires a Vercel Pro plan; the Hobby plan caps at 60s.
-// SETUP.md (Task 15) records which plan Moiz is on and how to change this.
-export const maxDuration = 300
+// function may run (seconds). Whisper on a long note can take minutes. The
+// account is on the Hobby plan (60s cap) — so keep voice notes under ~8-10
+// minutes, or split longer recitations. On Pro, raise this to 300 and the
+// length pressure relaxes (see SETUP.md's plan note).
+export const maxDuration = 60
 
 const BodySchema = z.object({ entryId: z.string() })
 
