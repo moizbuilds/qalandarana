@@ -12,7 +12,8 @@
 //
 // NOTE: RELATIVE imports (../src/lib/...), not the '@/' alias — tsx does not read
 // tsconfig `paths` at runtime. Same convention as scripts/seed.ts.
-import 'dotenv/config'
+// Must be the FIRST import — see load-env.ts for why (import hoisting).
+import './load-env'
 import { readFileSync } from 'node:fs'
 import {
   viaClaude,

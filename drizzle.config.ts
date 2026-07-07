@@ -5,7 +5,10 @@
 // migration and generates the SQL to close the gap, so schema changes are
 // tracked in git and applied in order — never by hand-editing the live DB.
 import { defineConfig } from 'drizzle-kit'
-import 'dotenv/config'
+import dotenv from 'dotenv'
+// dotenv's default file is .env; our secrets live in .env.local (Next.js convention).
+dotenv.config({ path: '.env.local' })
+dotenv.config()
 
 export default defineConfig({
   schema: './src/lib/schema.ts',

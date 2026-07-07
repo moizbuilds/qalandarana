@@ -10,7 +10,8 @@
 // NOTE: RELATIVE imports (../src/lib/...), not the '@/' alias — tsx does not read
 // tsconfig `paths` at runtime, so '@/' would fail when this script actually runs.
 // Same convention as scripts/seed.ts.
-import 'dotenv/config'
+// Must be the FIRST import — see load-env.ts for why (import hoisting).
+import './load-env'
 import { getEnv } from '../src/lib/env'
 
 // CONCEPT: a webhook is a URL you register with a third party so IT calls YOU

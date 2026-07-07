@@ -11,7 +11,8 @@
 // NOTE: this uses RELATIVE imports (../src/lib/...) rather than the '@/' alias.
 // tsx does not read tsconfig `paths` at runtime, so '@/' would fail when this
 // script actually runs; relative paths resolve under both tsc and tsx.
-import 'dotenv/config'
+// Must be the FIRST import — see load-env.ts for why (import hoisting).
+import './load-env'
 import { db } from '../src/lib/db'
 import { maqamat, poets, admins } from '../src/lib/schema'
 import { getEnv } from '../src/lib/env'
