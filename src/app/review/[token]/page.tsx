@@ -64,7 +64,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
           <section className="w-full space-y-4">
             <p className="eyebrow text-center" style={{ opacity: 0.55 }}>Your explanation</p>
             {entry.explanationOriginal ? (
-              <p className="urdu" style={{ fontSize: '1.25rem', lineHeight: 2.2 }}>{entry.explanationOriginal}</p>
+              <p dir="rtl" lang="ur" className="urdu" style={{ fontSize: '1.25rem', lineHeight: 2.2 }}>{entry.explanationOriginal}</p>
             ) : null}
             {entry.explanationEnglish ? (
               <p className="font-body" style={{ fontSize: '1.125rem', lineHeight: 1.8, opacity: 0.9 }}>

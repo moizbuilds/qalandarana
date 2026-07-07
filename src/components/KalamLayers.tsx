@@ -45,7 +45,7 @@ export function KalamLayers({
           className="animate-fade-up space-y-3 text-center"
           style={{ animationDelay: `${i * 120}ms` }}
         >
-          <p className="urdu" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.75rem)' }}>
+          <p dir="rtl" lang="ur" className="urdu" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.75rem)' }}>
             {c.o}
           </p>
           <p className="whisper whitespace-pre-line" style={{ fontSize: '1.0625rem', lineHeight: 1.6 }}>

@@ -114,7 +114,7 @@ export default async function EntryPage({ params }: { params: Promise<{ id: stri
               <section className="w-full space-y-4">
                 <p className="eyebrow text-center" style={{ opacity: 0.55 }}>His explanation</p>
                 {entry.explanationOriginal ? (
-                  <p className="urdu" style={{ fontSize: '1.375rem', lineHeight: 2.2 }}>
+                  <p dir="rtl" lang="ur" className="urdu" style={{ fontSize: '1.375rem', lineHeight: 2.2 }}>
                     {entry.explanationOriginal}
                   </p>
                 ) : null}

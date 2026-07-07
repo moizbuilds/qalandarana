@@ -91,11 +91,3 @@ export async function seedE2E(): Promise<void> {
     },
   ])
 }
-
-// Allow running standalone: `npx tsx e2e/seed-e2e.ts`. When imported by the spec
-// instead, this block is skipped (import.meta.url won't match the entry file).
-if (import.meta.url === `file://${process.argv[1]}`) {
-  seedE2E()
-    .then(() => { console.log('e2e fixtures seeded'); process.exit(0) })
-    .catch((e) => { console.error(e); process.exit(1) })
-}
