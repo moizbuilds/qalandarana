@@ -7,6 +7,7 @@
 // and maqam directly and returns finished HTML. notFound() renders the 404 page
 // for missing, unpublished, or malformed-id requests. In Next 16 `params` is a
 // Promise, so we await it before reading `id`.
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { z } from 'zod'
@@ -14,11 +15,13 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { poets, maqamat } from '@/lib/schema'
 import { getEntryById } from '@/lib/entries'
+import { getEnv } from '@/lib/env'
 import { Medallion } from '@/components/Medallion'
 import { KalamLayers } from '@/components/KalamLayers'
 import { GoldRule } from '@/components/ornament/GoldRule'
 import { Khatam } from '@/components/ornament/Khatam'
 import { SetBodyValley } from '@/components/SetBodyValley'
+import { ShareCard } from '@/components/ShareCard'
 
 // The id is untrusted (it's from the URL). Postgres' uuid type throws on a
 // malformed value, which would surface as a 500, so we validate the shape first
@@ -27,6 +30,30 @@ const idSchema = z.string().uuid()
 
 // Next prerenders pages at build time by default; this one must read the DB per-request.
 export const dynamic = 'force-dynamic'
+
+// generateMetadata gives each entry its own title + link-unfurl card. A shared
+// entry link shows the OG image (the wide card from /api/card) with the verse,
+// so the archive looks considered wherever it travels. Published entries only.
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params
+  if (!idSchema.safeParse(id).success) return {}
+  const entry = await getEntryById(id)
+  if (!entry || entry.status !== 'published') return {}
+
+  const title = entry.title ?? 'A recitation'
+  const description = entry.kalamEnglish?.split('\n')[0]?.trim() ?? 'A sufi recitation, archived.'
+  const cardUrl = `${getEnv().APP_URL}/api/card/${id}?format=wide`
+  return {
+    title,
+    description,
+    openGraph: {
+      title: `${title} — Qalandarana`,
+      description,
+      images: [{ url: cardUrl, width: 1600, height: 900 }],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [cardUrl] },
+  }
+}
 
 export default async function EntryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -100,15 +127,18 @@ export default async function EntryPage({ params }: { params: Promise<{ id: stri
             </>
           ) : null}
 
-          <footer className="flex flex-col items-center gap-4 pt-4">
-            <Khatam size={18} className="text-gold" />
-            {poet ? (
-              <Link href={`/poets/${poet.id}`} className="eyebrow text-gold">
-                {poet.nameEnglish} · {poet.era}
-              </Link>
-            ) : (
-              <p className="eyebrow" style={{ opacity: 0.6 }}>Unknown</p>
-            )}
+          <footer className="flex flex-col items-center gap-8 pt-4">
+            <div className="flex flex-col items-center gap-4">
+              <Khatam size={18} className="text-gold" />
+              {poet ? (
+                <Link href={`/poets/${poet.id}`} className="eyebrow text-gold">
+                  {poet.nameEnglish} · {poet.era}
+                </Link>
+              ) : (
+                <p className="eyebrow" style={{ opacity: 0.6 }}>Unknown</p>
+              )}
+            </div>
+            <ShareCard entryId={entry.id} />
           </footer>
         </article>
       </main>

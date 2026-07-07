@@ -46,5 +46,20 @@ Centered `42rem` column on the entry's own valley tone, wrapped in a 1px gold ha
 ## Gateway
 Night ink, centered. Breathing khatam mark; one Bulleh Shah line in Nastaliq (`علموں بس کریں او یار`) with an EB-italic whisper beneath; a single passphrase field styled as a **ruled manuscript line** (bottom border only, gold on focus), Enter as small-caps. One girih watermark ≤4%. The gate is a threshold, not a form.
 
+## Satori Nastaliq verdict (Phase 2 Task 2 spike)
+**Satori (next/og) CANNOT render Nastaliq.** Rendering a Gulzar couplet through
+`ImageResponse` throws `lookupType: 6 - substFormat: 1 is not yet supported` —
+Satori's opentype shaper doesn't implement the chaining-contextual GSUB lookups
+every real Nastaliq font relies on for its ligatures and contextual forms. Noto
+Nastaliq is no simpler. So the OG/quote-card image is **Latin-only** (Roman
+transliteration + English + poet + khatam + valley tone + QALANDARANA), which
+Satori handles perfectly and which still carries the *sound* of the verse. The
+downloadable full-Nastaliq image card is **deferred to Phase 3**, where it rides
+the same headless-Chromium/Remotion rendering infra as the audiograms (a
+screenshot of the real browser-rendered card is the only reliable path, and it's
+too heavy a dependency to add on the Hobby plan just for this). The public
+`/entry/[id]` page already renders the full Nastaliq beautifully for anyone who
+wants to screenshot it by hand today.
+
 ## Risk taken (and why it's justified)
 The scroll-linked full-page color pilgrimage **ending in an inverted light palette** is the one bold move. It's justified because it renders the subject's actual metaphysics — the sufi path from seeking to annihilation-into-light — as the primary interaction, not decoration. Everything else stays disciplined and quiet so this reads clearly.
