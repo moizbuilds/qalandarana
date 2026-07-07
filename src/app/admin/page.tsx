@@ -12,7 +12,8 @@
 // STAYS one by design. The public site gets the "Night Journey" beauty in Phase 2.
 import Link from 'next/link'
 import { listEntries } from '@/lib/entries'
-import type { EntryStatus } from '@/lib/status'
+import { getEnv } from '@/lib/env'
+import { STATUSES, type EntryStatus } from '@/lib/status'
 
 // A muted color per status so the eye can triage the table at a glance. failed is
 // loud (red); published is calm (green); everything mid-pipeline is neutral.
@@ -39,13 +40,31 @@ export const dynamic = 'force-dynamic'
 
 export default async function AdminDashboardPage() {
   const entries = await listEntries()
+  const appUrl = getEnv().APP_URL
+
+  // Counts per status for the summary strip — only statuses that actually occur
+  // are shown, in the canonical pipeline order.
+  const counts = new Map<EntryStatus, number>()
+  for (const e of entries) counts.set(e.status as EntryStatus, (counts.get(e.status as EntryStatus) ?? 0) + 1)
 
   return (
     <main className="mx-auto max-w-5xl p-6 space-y-6">
       <header className="flex items-baseline justify-between">
         <h1 className="text-2xl font-semibold">Entries</h1>
-        <p className="text-sm text-gray-500">{entries.length} total</p>
+        <nav className="flex items-center gap-4 text-sm">
+          <Link href="/admin/poets" className="text-blue-700 underline">Poets</Link>
+          <span className="text-gray-500">{entries.length} total</span>
+        </nav>
       </header>
+
+      {/* Status board — where everything stands at a glance. */}
+      <div className="flex flex-wrap gap-2">
+        {STATUSES.filter((s) => counts.get(s)).map((s) => (
+          <span key={s} className={`rounded px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[s]}`}>
+            {s} · {counts.get(s)}
+          </span>
+        ))}
+      </div>
 
       {entries.length === 0 ? (
         <p className="text-gray-500">No entries yet.</p>
@@ -57,27 +76,43 @@ export default async function AdminDashboardPage() {
                 <th className="p-3 font-medium">Created</th>
                 <th className="p-3 font-medium">Title</th>
                 <th className="p-3 font-medium">Status</th>
+                <th className="p-3 font-medium">Review link</th>
                 <th className="p-3 font-medium">Error</th>
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry) => (
-                <tr key={entry.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td className="whitespace-nowrap p-3 text-gray-500">{formatCreated(entry.createdAt)}</td>
-                  <td className="p-3">
-                    <Link href={`/admin/entry/${entry.id}`} className="font-medium text-blue-700 underline">
-                      {entry.title ?? '—'}
-                    </Link>
-                  </td>
-                  <td className="p-3">
-                    <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[entry.status as EntryStatus]}`}>
-                      {entry.status}
-                    </span>
-                  </td>
-                  {/* errorMessage only shows for failed entries; red so it can't be missed. */}
-                  <td className="p-3 text-red-700">{entry.errorMessage ?? ''}</td>
-                </tr>
-              ))}
+              {entries.map((entry) => {
+                // An entry awaiting father's blessing has a shareable review URL;
+                // surfacing it here lets Moiz re-send the link if father lost it.
+                const awaitingReview = entry.status === 'in_review' || entry.status === 'needs_fix'
+                const reviewUrl = awaitingReview && entry.reviewToken
+                  ? `${appUrl}/review/${entry.reviewToken}`
+                  : null
+                return (
+                  <tr key={entry.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                    <td className="whitespace-nowrap p-3 text-gray-500">{formatCreated(entry.createdAt)}</td>
+                    <td className="p-3">
+                      <Link href={`/admin/entry/${entry.id}`} className="font-medium text-blue-700 underline">
+                        {entry.title ?? '—'}
+                      </Link>
+                    </td>
+                    <td className="p-3">
+                      <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[entry.status as EntryStatus]}`}>
+                        {entry.status}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {reviewUrl ? (
+                        <a href={reviewUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">
+                          open
+                        </a>
+                      ) : null}
+                    </td>
+                    {/* errorMessage only shows for failed entries; red so it can't be missed. */}
+                    <td className="p-3 text-red-700">{entry.errorMessage ?? ''}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
