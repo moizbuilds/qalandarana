@@ -15,8 +15,12 @@
 // and the day someone forgets is the day the pipeline breaks.
 import { eq, and, desc } from 'drizzle-orm'
 import { db } from './db'
-import { entries, type Entry, type NewEntry } from './schema'
+import { entries, poets, type Entry, type NewEntry } from './schema'
 import { assertTransition, type EntryStatus } from './status'
+
+// A poet row, plus the poet-room reads that hang off it. Kept here with the
+// other entry reads because a poet's "room" is really a view of their entries.
+type Poet = typeof poets.$inferSelect
 
 // Create a fresh entry from a newly-received voice note. Sets nothing beyond
 // these four fields — `status` defaults to 'received' in the schema, and every
@@ -107,6 +111,36 @@ export async function listPublishedByMaqam(): Promise<Map<string, Entry[]>> {
     else byMaqam.set(key, [entry])
   }
   return byMaqam
+}
+
+// Every poet, each with a count of their PUBLISHED entries — the /poets index.
+// One entries read + one poets read, joined in memory (family-scale data), so we
+// don't issue a count query per poet.
+export async function listPoetsWithCounts(): Promise<Array<Poet & { count: number }>> {
+  const [allPoets, published] = await Promise.all([
+    db.select().from(poets).orderBy(desc(poets.era)),
+    listPublishedEntries(),
+  ])
+  const counts = new Map<string, number>()
+  for (const e of published) {
+    if (e.poetId) counts.set(e.poetId, (counts.get(e.poetId) ?? 0) + 1)
+  }
+  return allPoets.map((p) => ({ ...p, count: counts.get(p.id) ?? 0 }))
+}
+
+// One poet's room: the poet and their published entries (newest first), or
+// undefined if no such poet. The page 404s on undefined.
+export async function getPoetWithEntries(
+  id: string,
+): Promise<{ poet: Poet; entries: Entry[] } | undefined> {
+  const [poet] = await db.select().from(poets).where(eq(poets.id, id)).limit(1)
+  if (!poet) return undefined
+  const theirEntries = await db
+    .select()
+    .from(entries)
+    .where(and(eq(entries.poetId, id), eq(entries.status, 'published')))
+    .orderBy(desc(entries.publishedAt))
+  return { poet, entries: theirEntries }
 }
 
 // Admin edits to an entry's content (title, kalam, explanation, etc.).
