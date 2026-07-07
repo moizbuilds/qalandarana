@@ -18,7 +18,7 @@ import { eq } from 'drizzle-orm'
 import { getEntryById } from '@/lib/entries'
 import { db } from '@/lib/db'
 import { poets } from '@/lib/schema'
-import { INK, IVORY, GOLD, VALLEY_HEX, DEFAULT_CARD_BG } from '@/lib/valley-colors'
+import { INK, IVORY, GOLD, GOLD_FANA, VALLEY_HEX, DEFAULT_CARD_BG } from '@/lib/valley-colors'
 import { maqamat } from '@/lib/schema'
 
 export const dynamic = 'force-dynamic'
@@ -59,6 +59,8 @@ export async function GET(
   const bg = maqam ? VALLEY_HEX[maqam.slug] ?? DEFAULT_CARD_BG : DEFAULT_CARD_BG
   const isLight = maqam?.slug === 'fana'
   const fg = isLight ? INK : IVORY
+  // Bright gold is unreadable on the Fana light ground — deepen it to the bronze.
+  const gold = isLight ? GOLD_FANA : GOLD
 
   const cormorant = await readFile(join(process.cwd(), 'src/assets/Cormorant-Medium.ttf'))
 
@@ -89,12 +91,12 @@ export async function GET(
             left: 40,
             right: 40,
             bottom: 40,
-            border: `1px solid ${GOLD}66`,
+            border: `1px solid ${gold}66`,
           }}
         />
 
         {/* khatam mark */}
-        <svg width="46" height="46" viewBox="0 0 100 100" fill="none" stroke={GOLD} strokeWidth="2" style={{ marginBottom: 48 }}>
+        <svg width="46" height="46" viewBox="0 0 100 100" fill="none" stroke={gold} strokeWidth="2" style={{ marginBottom: 48 }}>
           <rect x="20" y="20" width="60" height="60" />
           <rect x="20" y="20" width="60" height="60" transform="rotate(45 50 50)" />
         </svg>
@@ -112,7 +114,7 @@ export async function GET(
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 64, gap: 10 }}>
           {poet ? (
-            <div style={{ fontSize: 26, letterSpacing: 4, textTransform: 'uppercase', color: GOLD }}>
+            <div style={{ fontSize: 26, letterSpacing: 4, textTransform: 'uppercase', color: gold }}>
               {poet.nameEnglish}
             </div>
           ) : null}

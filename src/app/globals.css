@@ -9,7 +9,8 @@
   --ink: #0b0e1a;             /* gateway night — the ground we begin on */
   --ivory: #f2ebdc;          /* moon ivory — the text, and Fana's light */
   --gold: #c9a227;           /* old gold — thread, hairlines, actives; rare on purpose */
-  --gold-deep: #9a7b1e;      /* gold that passes AA on the ivory (Fana) ground */
+  --gold-deep: #9a7b1e;      /* a slightly deeper gold for large accents */
+  --gold-fana: #6d5411;      /* deep bronze — the ONLY gold legible (AA) on Fana's ivory */
 
   /* the seven valleys, in the order the seeker walks them */
   --valley-talab: #131a33;   /* deep indigo — seeking */
@@ -60,8 +61,10 @@ body[data-valley="marifat"] { background-color: var(--valley-marifat); }
 body[data-valley="istighna"] { background-color: var(--valley-istighna); }
 body[data-valley="tawhid"] { background-color: var(--valley-tawhid); }
 body[data-valley="hairat"] { background-color: var(--valley-hairat); }
-/* Fana: the inversion — light ground, ink text. The climax of the path. */
-body[data-valley="fana"] { background-color: var(--valley-fana); color: var(--ink); }
+/* Fana: the inversion — light ground, ink text. The climax of the path. On this
+   pale ground the bright gold would be unreadable (2:1), so every gold accent —
+   thread, khatam, links — deepens to the bronze that clears AA on ivory. */
+body[data-valley="fana"] { background-color: var(--valley-fana); color: var(--ink); --gold: var(--gold-fana); }
 
 /* Nastaliq layout law: without generous leading + block padding, descenders clip. */
 .urdu {

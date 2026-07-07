@@ -9,6 +9,9 @@
 export const INK = '#0b0e1a'
 export const IVORY = '#f2ebdc'
 export const GOLD = '#c9a227'
+// The deep bronze that stays legible (AA) on the Fana light ground; bright gold
+// is only ~2:1 there. Cards for a Fana entry use this for their gold accents.
+export const GOLD_FANA = '#6d5411'
 
 // slug → the valley's night tone. Fana is light, so its card flips to ink text.
 export const VALLEY_HEX: Record<string, string> = {
