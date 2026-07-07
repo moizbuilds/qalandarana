@@ -20,6 +20,9 @@ export default defineConfig({
   // Fail fast in CI, allow reruns locally. No retries: these tests are
   // deterministic against seeded data, so a retry would only hide a real flake.
   fullyParallel: false,
+  // One worker: the suite seeds and mutates ONE shared database with fixed-id
+  // fixtures, so parallel workers would race on the same rows. Serial is correct.
+  workers: 1,
   forbidOnly: !!process.env.CI,
   reporter: 'list',
   use: {

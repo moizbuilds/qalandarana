@@ -1,26 +1,136 @@
 @import "tailwindcss";
 
+/*
+  Qalandarana design tokens — the ONE place hex values live (design-notes.md).
+  Everything downstream references these via Tailwind's @theme or var(--…).
+  Spec §5 pins every value here; do not introduce hex literals elsewhere.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #0b0e1a;             /* gateway night — the ground we begin on */
+  --ivory: #f2ebdc;          /* moon ivory — the text, and Fana's light */
+  --gold: #c9a227;           /* old gold — thread, hairlines, actives; rare on purpose */
+  --gold-deep: #9a7b1e;      /* a slightly deeper gold for large accents */
+  --gold-fana: #6d5411;      /* deep bronze — the ONLY gold legible (AA) on Fana's ivory */
+
+  /* the seven valleys, in the order the seeker walks them */
+  --valley-talab: #131a33;   /* deep indigo — seeking */
+  --valley-ishq: #3a1220;    /* blackened crimson — love */
+  --valley-marifat: #0e2e2a; /* deep emerald-teal — knowledge */
+  --valley-istighna: #1c2430;/* cool slate — detachment */
+  --valley-tawhid: #152252;  /* pure lapis — unity */
+  --valley-hairat: #2a1840;  /* midnight violet — wonderment */
+  --valley-fana: #f2ebdc;    /* Fana ends in LIGHT, not darkness */
 }
 
+/* Expose tokens + fonts to Tailwind utilities (v4 reads @theme, no JS config). */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: var(--ink);
+  --color-ivory: var(--ivory);
+  --color-gold: var(--gold);
+  --color-gold-deep: var(--gold-deep);
+  --color-valley-talab: var(--valley-talab);
+  --color-valley-ishq: var(--valley-ishq);
+  --color-valley-marifat: var(--valley-marifat);
+  --color-valley-istighna: var(--valley-istighna);
+  --color-valley-tawhid: var(--valley-tawhid);
+  --color-valley-hairat: var(--valley-hairat);
+  --color-valley-fana: var(--valley-fana);
+
+  --font-nastaliq: var(--font-nastaliq), var(--font-nastaliq-fallback), serif;
+  --font-display: var(--font-display), Georgia, serif;
+  --font-body: var(--font-body), Georgia, serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/*
+  The color pilgrimage. An IntersectionObserver stamps the current valley slug
+  onto <body data-valley="…">; this rule set does the transmutation, and the
+  transition is what makes it a slow tide rather than a jump.
+  CONCEPT: scroll-linked CSS animations aren't cross-browser yet, so we drive
+  the change with an observer + a plain background-color transition instead.
+*/
+/* The site is a nightscape; tell the browser so native controls, scrollbars,
+   and form fields render dark to match (Fana's light sections are the exception,
+   handled per-section). */
+html { color-scheme: dark; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--ink);
+  color: var(--ivory);
+  font-family: var(--font-body);
+  transition: background-color 1200ms ease-out, color 1200ms ease-out;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Kill the 300ms double-tap delay and the grey tap flash on touch. */
+a, button, input, [role='button'] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep the display headings from leaving a lonely last word. */
+h1, h2 { text-wrap: balance; }
+body[data-valley="talab"] { background-color: var(--valley-talab); }
+body[data-valley="ishq"] { background-color: var(--valley-ishq); }
+body[data-valley="marifat"] { background-color: var(--valley-marifat); }
+body[data-valley="istighna"] { background-color: var(--valley-istighna); }
+body[data-valley="tawhid"] { background-color: var(--valley-tawhid); }
+body[data-valley="hairat"] { background-color: var(--valley-hairat); }
+/* Fana: the inversion — light ground, ink text. The climax of the path. On this
+   pale ground the bright gold would be unreadable (2:1), so every gold accent —
+   thread, khatam, links — deepens to the bronze that clears AA on ivory. */
+body[data-valley="fana"] { background-color: var(--valley-fana); color: var(--ink); --gold: var(--gold-fana); }
+
+/* Nastaliq layout law: without generous leading + block padding, descenders clip. */
+.urdu {
+  direction: rtl;
+  font-family: var(--font-nastaliq);
+  line-height: 2.3;
+  padding-block: 0.6em;
+}
+
+/* The roman transliteration — a whisper between the original and the English. */
+.whisper {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: color-mix(in srgb, var(--ivory) 58%, transparent);
+}
+body[data-valley="fana"] .whisper {
+  color: color-mix(in srgb, var(--ink) 58%, transparent);
+}
+
+/* UI micro-labels: letterspaced small caps, never shouting. */
+.eyebrow {
+  font-family: var(--font-body);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.75rem;
+}
+
+/* The breathing lamp halo — a slow zikr, only ever on lit stations. */
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 45%, transparent); opacity: 0.9; }
+  50% { box-shadow: 0 0 22px 6px color-mix(in srgb, var(--gold) 22%, transparent); opacity: 1; }
+}
+.animate-breathe { animation: breathe 4s ease-in-out infinite; }
+
+/* Couplets and sections rise a little as they enter the viewport. */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 800ms ease-out both; }
+
+/* Gold focus ring, honored everywhere keyboard users land. */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+/* The quality floor: anyone who asks for stillness gets it. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
