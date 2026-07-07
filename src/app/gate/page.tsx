@@ -38,6 +38,7 @@ export default function GatePage() {
               name="passphrase"
               type="password"
               autoComplete="off"
+              spellCheck={false}
               autoFocus
               required
               aria-describedby={state?.error ? 'gate-error' : undefined}

@@ -48,6 +48,11 @@
   CONCEPT: scroll-linked CSS animations aren't cross-browser yet, so we drive
   the change with an observer + a plain background-color transition instead.
 */
+/* The site is a nightscape; tell the browser so native controls, scrollbars,
+   and form fields render dark to match (Fana's light sections are the exception,
+   handled per-section). */
+html { color-scheme: dark; }
+
 body {
   background-color: var(--ink);
   color: var(--ivory);
@@ -55,6 +60,15 @@ body {
   transition: background-color 1200ms ease-out, color 1200ms ease-out;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Kill the 300ms double-tap delay and the grey tap flash on touch. */
+a, button, input, [role='button'] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep the display headings from leaving a lonely last word. */
+h1, h2 { text-wrap: balance; }
 body[data-valley="talab"] { background-color: var(--valley-talab); }
 body[data-valley="ishq"] { background-color: var(--valley-ishq); }
 body[data-valley="marifat"] { background-color: var(--valley-marifat); }

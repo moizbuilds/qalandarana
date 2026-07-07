@@ -24,7 +24,7 @@ export function ShareCard({ entryId }: { entryId: string }) {
     <div className="flex flex-col items-center gap-3">
       <p className="eyebrow" style={{ opacity: 0.45 }}>Share</p>
       <div className="flex items-center gap-6">
-        <button onClick={copyLink} className="eyebrow text-gold">
+        <button onClick={copyLink} className="eyebrow text-gold" aria-live="polite">
           {copied ? 'Link copied' : 'Copy link'}
         </button>
         <a

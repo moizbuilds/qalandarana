@@ -75,7 +75,7 @@ export function Medallion({ src, title }: { src: string; title: string }) {
           {playing ? '❚❚' : '▶'}
         </span>
       </button>
-      <figcaption className="eyebrow" style={{ opacity: 0.6 }}>
+      <figcaption className="eyebrow" style={{ opacity: 0.6, fontVariantNumeric: 'tabular-nums' }}>
         {mm}:{ss}
       </figcaption>
     </figure>
