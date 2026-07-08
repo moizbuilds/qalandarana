@@ -67,7 +67,7 @@ export default async function AdminEntryPage({ params }: { params: Promise<{ id:
     <main className="mx-auto max-w-3xl p-6 space-y-8">
       <header className="space-y-1">
         <a href="/admin" className="text-sm text-blue-700 underline">← All entries</a>
-        <h1 className="text-2xl font-semibold">{entry.title ?? '—'}</h1>
+        <h1 className="text-2xl font-semibold">{entry.title ?? 'Untitled'}</h1>
       </header>
 
       {/* ── Read-only record ─────────────────────────────────────────────── */}
@@ -105,14 +105,14 @@ export default async function AdminEntryPage({ params }: { params: Promise<{ id:
             <div className="space-y-1">
               <label htmlFor="poetId" className="block text-sm font-medium text-gray-700">Poet</label>
               <select id="poetId" name="poetId" defaultValue={entry.poetId ?? ''} className="w-full rounded border border-gray-300 p-2">
-                <option value="">—</option>
+                <option value="">None</option>
                 {allPoets.map((p) => <option key={p.id} value={p.id}>{p.nameEnglish}</option>)}
               </select>
             </div>
             <div className="space-y-1">
               <label htmlFor="maqamId" className="block text-sm font-medium text-gray-700">Maqam</label>
               <select id="maqamId" name="maqamId" defaultValue={entry.maqamId ?? ''} className="w-full rounded border border-gray-300 p-2">
-                <option value="">—</option>
+                <option value="">None</option>
                 {allMaqamat.map((m) => <option key={m.id} value={m.id}>{m.nameEnglish}</option>)}
               </select>
             </div>

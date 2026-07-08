@@ -93,7 +93,7 @@ export default async function AdminDashboardPage() {
                     <td className="whitespace-nowrap p-3 text-gray-500">{formatCreated(entry.createdAt)}</td>
                     <td className="p-3">
                       <Link href={`/admin/entry/${entry.id}`} className="font-medium text-blue-700 underline">
-                        {entry.title ?? '—'}
+                        {entry.title ?? 'Untitled'}
                       </Link>
                     </td>
                     <td className="p-3">

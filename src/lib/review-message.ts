@@ -19,5 +19,5 @@ import { getEnv } from './env'
 // back to 'Untitled' rather than sending a message with a blank name.
 export function buildReviewMessage(title: string | null, token: string): string {
   const link = `${getEnv().APP_URL}/review/${token}`
-  return `'${title ?? 'Untitled'}' is ready to review — ${link}`
+  return `'${title ?? 'Untitled'}' is ready to review: ${link}`
 }
