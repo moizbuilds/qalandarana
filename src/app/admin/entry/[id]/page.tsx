@@ -104,7 +104,14 @@ export default async function AdminEntryPage({ params }: { params: Promise<{ id:
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
-              <label htmlFor="poetId" className="block text-sm font-medium text-gray-700">Poet</label>
+              <div className="flex items-baseline justify-between">
+                <label htmlFor="poetId" className="block text-sm font-medium text-gray-700">Poet</label>
+                {/* Jump to poet management in a new tab so unsaved entry edits
+                    aren't lost; add the missing poet, come back, reload, select. */}
+                <a href="/admin/poets" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-700 underline">
+                  Add or edit poets ↗
+                </a>
+              </div>
               <select id="poetId" name="poetId" defaultValue={entry.poetId ?? ''} className="w-full rounded border border-gray-300 p-2">
                 <option value="">None</option>
                 {allPoets.map((p) => <option key={p.id} value={p.id}>{p.nameEnglish}</option>)}
