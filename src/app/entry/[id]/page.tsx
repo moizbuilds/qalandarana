@@ -112,7 +112,7 @@ export default async function EntryPage({ params }: { params: Promise<{ id: stri
             <>
               <GoldRule className="w-full" />
               <section className="w-full space-y-4">
-                <p className="eyebrow text-center" style={{ opacity: 0.55 }}>His explanation</p>
+                <p className="eyebrow text-center" style={{ opacity: 0.55 }}>Context</p>
                 {entry.explanationOriginal ? (
                   <p dir="rtl" lang="ur" className="urdu" style={{ fontSize: '1.375rem', lineHeight: 2.2 }}>
                     {entry.explanationOriginal}
