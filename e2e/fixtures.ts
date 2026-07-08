@@ -44,11 +44,11 @@ export const REVIEW_ENTRY = {
 // (Test-side expected values necessarily restate what the app should produce;
 // that's the assertion, not accidental duplication.)
 export const VALLEY_NAMES_IN_ORDER = [
-  'Talab — Seeking',
-  'Ishq — Love',
-  "Ma'rifat — Knowledge",
-  'Istighna — Detachment',
-  'Tawhid — Unity',
-  'Hairat — Wonderment',
-  'Fana — Annihilation',
+  'Talab, Seeking',
+  'Ishq, Love',
+  "Ma'rifat, Knowledge",
+  'Istighna, Detachment',
+  'Tawhid, Unity',
+  'Hairat, Wonderment',
+  'Fana, Annihilation',
 ] as const

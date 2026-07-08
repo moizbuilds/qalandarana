@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title,
     description,
     openGraph: {
-      title: `${title} — Qalandarana`,
+      title: `${title} · Qalandarana`,
       description,
       images: [{ url: cardUrl, width: 1600, height: 900 }],
     },

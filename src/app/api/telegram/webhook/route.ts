@@ -112,7 +112,7 @@ export async function POST(request: Request): Promise<Response> {
     if (tooLong || tooBig) {
       await sendTelegramMessage(
         message.chat.id,
-        'this one is too long — please split it under 20 minutes and resend 🙏',
+        'this one is too long. Please split it under 20 minutes and resend 🙏',
       )
       return new Response(null, { status: 200 })
     }

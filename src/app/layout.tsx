@@ -7,10 +7,10 @@ import './globals.css'
 export const metadata: Metadata = {
   title: {
     default: 'Qalandarana',
-    template: '%s — Qalandarana',
+    template: '%s · Qalandarana',
   },
   description:
-    'An archive of Fawad Rana reciting and explaining the sufi kalam of Punjab — a journey through the seven valleys.',
+    'An archive of Fawad Rana reciting and explaining the sufi kalam of Punjab, a journey through the seven valleys.',
 }
 
 // The browser chrome (mobile address bar, etc.) matches the night ground.

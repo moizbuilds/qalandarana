@@ -41,7 +41,61 @@ export default async function JourneyPage() {
       >
         <SilsilaThread />
 
-        {/* The gateway crown of the scroll — the mark and the invitation. */}
+        {/* The index: the whole archive as one scannable list, grouped by valley,
+            shown first. Tapping a valley name glides down to its station; tapping
+            a poem opens its folio. The immersive journey follows underneath. */}
+        <section className="mx-auto w-full max-w-2xl px-6 pt-16 pb-12">
+          <div className="mb-14 flex flex-col items-center gap-4 text-center">
+            <Khatam size={32} className="text-gold" />
+            <p className="eyebrow text-gold">Qalandarana</p>
+            <h1 className="font-display text-ivory" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: 500 }}>
+              The archive
+            </h1>
+          </div>
+
+          <nav className="flex flex-col gap-9">
+            {valleys.map((valley) => {
+              const list = byMaqam.get(valley.id) ?? []
+              return (
+                <div key={valley.id}>
+                  <a
+                    href={`#${valley.slug}`}
+                    className="font-display text-gold transition-opacity hover:opacity-70"
+                    style={{ fontSize: '1.5rem', fontWeight: 500 }}
+                  >
+                    {valley.nameEnglish}
+                  </a>
+                  {list.length === 0 ? (
+                    <p className="eyebrow mt-2" style={{ opacity: 0.4 }}>none yet</p>
+                  ) : (
+                    <ul className="mt-3">
+                      {list.map((entry) => (
+                        <li key={entry.id} className="border-t" style={{ borderColor: 'color-mix(in srgb, var(--gold) 18%, transparent)' }}>
+                          <Link href={`/entry/${entry.id}`} className="group flex items-baseline justify-between gap-4 py-3">
+                            <span className="font-body text-ivory transition-opacity group-hover:opacity-70" style={{ fontSize: '1.0625rem' }}>
+                              {entry.title ?? 'Untitled'}
+                            </span>
+                            <span className="eyebrow whitespace-nowrap" style={{ opacity: 0.55 }}>
+                              {entry.poetId ? poetName.get(entry.poetId) ?? 'Unknown' : 'Unknown'}
+                              {'  ·  '}
+                              {formatDuration(entry.durationSec)}
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+          </nav>
+
+          <p className="eyebrow mt-16 text-center text-gold" style={{ opacity: 0.7 }}>
+            Walk the journey ↓
+          </p>
+        </section>
+
+        {/* The gateway crown of the immersive journey below. */}
         <section className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-6 text-center">
           <Khatam size={40} className="text-gold" />
           <p className="eyebrow text-gold">The Seven Valleys</p>
@@ -73,7 +127,7 @@ export default async function JourneyPage() {
         {unplaced.length > 0 ? (
           <ValleyStation
             slug="unplaced"
-            nameOriginal="—"
+            nameOriginal=""
             nameEnglish="Unplaced"
             description="Recitations not yet set upon the path."
             index={0}
@@ -113,6 +167,7 @@ function ValleyStation({
   const lit = entries.length > 0
   return (
     <section
+      id={slug}
       data-valley-section={slug}
       className="relative flex min-h-screen flex-col justify-center py-24"
       style={{ paddingLeft: 'calc(var(--thread-x) + clamp(1.5rem, 5vw, 4rem))', paddingRight: 'clamp(1.5rem, 5vw, 4rem)' }}

@@ -51,7 +51,11 @@
 /* The site is a nightscape; tell the browser so native controls, scrollbars,
    and form fields render dark to match (Fana's light sections are the exception,
    handled per-section). */
-html { color-scheme: dark; }
+html { color-scheme: dark; scroll-behavior: smooth; }
+
+/* Tapping a valley in the index glides down to its station; the offset keeps the
+   station's name clear of the very top edge. */
+[data-valley-section] { scroll-margin-top: 1.5rem; }
 
 body {
   background-color: var(--ink);
@@ -133,4 +137,5 @@ body[data-valley="fana"] .whisper {
     animation: none !important;
     transition: none !important;
   }
+  html { scroll-behavior: auto; }
 }

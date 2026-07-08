@@ -47,7 +47,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
           className="w-full space-y-3 p-5"
           style={{ border: '1px solid color-mix(in srgb, var(--gold) 50%, transparent)' }}
         >
-          <h2 className="eyebrow text-gold">Verses I corrected — please check</h2>
+          <h2 className="eyebrow text-gold">Verses I corrected, please check</h2>
           {entry.corrections.map((c, i) => (
             <p key={i} dir="rtl" lang="ur" className="urdu" style={{ fontSize: '1.25rem' }}>
               <s style={{ opacity: 0.5 }}>{c.heard}</s>
@@ -76,7 +76,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
       ) : null}
 
       {published ? (
-        <p className="eyebrow text-gold">✓ Published — thank you</p>
+        <p className="eyebrow text-gold">✓ Published, thank you</p>
       ) : (
         <div className="flex w-full flex-col gap-3 sm:flex-row">
           <form action={approveEntry.bind(null, token)} className="flex-1">
