@@ -20,6 +20,7 @@ import { getEnv } from '@/lib/env'
 import { createEntry, getEntryByTelegramMessageId } from '@/lib/entries'
 import { sendTelegramMessage, getTelegramFileUrl, notifyAdmin } from '@/lib/telegram'
 import { triggerAdvance } from '@/lib/advance-call'
+import { extFromMime } from '@/lib/audio-format'
 
 // Telegram's voice notes cap at 25 minutes here (1500s). Whisper cost + Vercel
 // function time both scale with length, so anything longer is bounced with an
@@ -32,14 +33,35 @@ const AUDIO_FETCH_TIMEOUT_MS = 60_000
 // The slice of Telegram's update we read. `.loose()` keeps every other field
 // (there are dozens) without us having to model them — we only validate what we
 // touch. `voice` is optional because most messages aren't voice notes.
+// A piece of audio Telegram delivered, in any of the three shapes it uses:
+//   - voice:    a recording made inside Telegram (hold-the-mic) — always ogg.
+//   - audio:    a music/audio FILE — this is how a FORWARDED WhatsApp voice note
+//               arrives (mime audio/mpeg = mp3). The app's actual use case.
+//   - document: a generic file; we accept it only when its mime says it's audio.
+// duration/mime_type/file_size are optional because documents omit them.
+const MediaSchema = z
+  .object({
+    file_id: z.string(),
+    mime_type: z.string().optional(),
+    duration: z.number().optional(),
+    file_size: z.number().optional(),
+  })
+  .loose()
+
 const UpdateSchema = z.object({
   message: z.object({
     message_id: z.number(),
     chat: z.object({ id: z.number() }).loose(),
     from: z.object({ id: z.number() }).loose(),
-    voice: z.object({ file_id: z.string(), duration: z.number() }).loose().optional(),
+    voice: MediaSchema.optional(),
+    audio: MediaSchema.optional(),
+    document: MediaSchema.optional(),
   }).loose(),
 }).loose()
+
+// Telegram's Bot API caps file downloads at 20MB. A note larger than this can't
+// be fetched, so bounce it early with the same friendly split-it message.
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
 
 export async function POST(request: Request): Promise<Response> {
   const env = getEnv()
@@ -56,8 +78,16 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return new Response(null, { status: 200 })
   const { message } = parsed.data
 
-  // 3. Non-voice message: ignore silently.
-  if (!message.voice) return new Response(null, { status: 200 })
+  // 3. Find the audio. A native voice recording, a forwarded audio file (the
+  // common case — WhatsApp voice notes forward as `audio`), or an audio document.
+  // A document that isn't audio (a stray PDF) is ignored. No audio → nothing to do.
+  const media =
+    message.voice ??
+    message.audio ??
+    (message.document && (message.document.mime_type ?? '').startsWith('audio/')
+      ? message.document
+      : undefined)
+  if (!media) return new Response(null, { status: 200 })
 
   // 4. Unknown sender: SILENCE. We don't reply to strangers — an ack would
   // confirm the bot exists and who it belongs to. Just drop it.
@@ -73,18 +103,23 @@ export async function POST(request: Request): Promise<Response> {
     const existing = await getEntryByTelegramMessageId(message.message_id)
     if (existing) return new Response(null, { status: 200 })
 
-    // 6. Too long: bounce with an apology, create nothing.
-    if (message.voice.duration > MAX_VOICE_DURATION_SEC) {
+    // 6. Too long or too big: bounce with an apology, create nothing. Documents
+    // may omit duration, so we also guard on file_size (Telegram caps downloads
+    // at 20MB anyway) — a note failing either bound gets the same friendly reply.
+    const duration = media.duration ?? 0
+    const tooLong = duration > MAX_VOICE_DURATION_SEC
+    const tooBig = (media.file_size ?? 0) > MAX_FILE_SIZE_BYTES
+    if (tooLong || tooBig) {
       await sendTelegramMessage(
         message.chat.id,
-        'this one is longer than 25 minutes — please split it and resend 🙏',
+        'this one is too long — please split it under 20 minutes and resend 🙏',
       )
       return new Response(null, { status: 200 })
     }
 
     // 7. Happy path. Resolve the file_id to a download URL, pull the bytes, store
     // them in blob, create the entry, ack the sender, then kick the pipeline.
-    const fileUrl = await getTelegramFileUrl(message.voice.file_id)
+    const fileUrl = await getTelegramFileUrl(media.file_id)
     const audioRes = await fetch(fileUrl, { signal: AbortSignal.timeout(AUDIO_FETCH_TIMEOUT_MS) })
     if (!audioRes.ok) throw new Error(`Audio download failed: ${audioRes.status}`)
 
@@ -98,11 +133,15 @@ export async function POST(request: Request): Promise<Response> {
     // voice notes. A random suffix stops sequential/guessable pathnames (e.g. by
     // message_id) from being enumerable; the DB stores whatever suffixed URL put()
     // actually returns, so nothing needs to reconstruct the pathname later.
-    const blob = await put(`audio/${message.message_id}.ogg`, audioBuffer, { access: 'public', addRandomSuffix: true })
+    // Store under the real extension (mp3 for forwarded WhatsApp audio, ogg for a
+    // native voice note) so Whisper can later decode it by filename — see
+    // audio-format.ts. The DB keeps whatever suffixed URL put() returns.
+    const ext = extFromMime(media.mime_type)
+    const blob = await put(`audio/${message.message_id}.${ext}`, audioBuffer, { access: 'public', addRandomSuffix: true })
 
     const entry = await createEntry({
       audioUrl: blob.url,
-      durationSec: message.voice.duration,
+      durationSec: duration,
       telegramMessageId: message.message_id,
       telegramChatId: message.chat.id,
     })

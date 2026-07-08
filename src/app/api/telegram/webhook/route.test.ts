@@ -106,7 +106,7 @@ describe('POST /api/telegram/webhook', () => {
     expect(createEntry).not.toHaveBeenCalled()
     const [chatId, text] = sendTelegramMessage.mock.calls[0]
     expect(chatId).toBe(777)
-    expect(text).toMatch(/25 minutes/)
+    expect(text).toMatch(/too long/)
   })
 
   it('happy path: stores audio, creates entry, acks, and fires the advance call', async () => {
@@ -151,6 +151,59 @@ describe('POST /api/telegram/webhook', () => {
     expect(advanceInit.method).toBe('POST')
     expect(advanceInit.headers['x-internal-secret']).toBe('b'.repeat(16))
     expect(JSON.parse(advanceInit.body)).toEqual({ entryId: 'entry-new' })
+  })
+
+  it('accepts a FORWARDED audio file (WhatsApp voice note = audio/mpeg), stored as .mp3', async () => {
+    // This is the bug this whole path exists for: a forwarded WhatsApp voice note
+    // arrives as `audio` (mp3), not a native `voice` recording. It must process
+    // identically and be stored under the real extension so Whisper can decode it.
+    getEntryByTelegramMessageId.mockResolvedValue(undefined)
+    getTelegramFileUrl.mockResolvedValue('https://api.telegram.org/file/bottok/music/f.mp3')
+    put.mockResolvedValue({ url: 'https://blob.example/audio/7000-x9.mp3' })
+    createEntry.mockResolvedValue({ id: 'entry-fwd' })
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url.includes('/api/pipeline/advance')
+        ? new Response(JSON.stringify({ status: 'transcribed' }), { status: 200 })
+        : new Response(new Uint8Array([1, 2, 3, 4]), { status: 200 }),
+    ))
+
+    const audioUpdate = {
+      update_id: 3,
+      message: {
+        message_id: 7000,
+        chat: { id: 777 },
+        from: { id: ALLOWED_USER },
+        forward_date: 1700000000,
+        audio: { file_id: 'file-mp3', duration: 113, mime_type: 'audio/mpeg', file_size: 1_800_000 },
+      },
+    }
+    const res = await POST(webhookRequest(audioUpdate))
+
+    expect(res.status).toBe(200)
+    expect(getTelegramFileUrl).toHaveBeenCalledWith('file-mp3')
+    const [pathname] = put.mock.calls[0]
+    expect(pathname).toBe('audio/7000.mp3') // real extension, not .ogg
+    expect(createEntry).toHaveBeenCalledWith({
+      audioUrl: 'https://blob.example/audio/7000-x9.mp3',
+      durationSec: 113,
+      telegramMessageId: 7000,
+      telegramChatId: 777,
+    })
+    expect(sendTelegramMessage.mock.calls.find(([, t]) => /Got it/.test(t))).toBeTruthy()
+  })
+
+  it('ignores a non-audio document (a stray PDF): 200, no entry', async () => {
+    getEntryByTelegramMessageId.mockResolvedValue(undefined)
+    const pdfUpdate = {
+      update_id: 4,
+      message: {
+        message_id: 7100, chat: { id: 777 }, from: { id: ALLOWED_USER },
+        document: { file_id: 'file-pdf', mime_type: 'application/pdf', file_size: 1000 },
+      },
+    }
+    const res = await POST(webhookRequest(pdfUpdate))
+    expect(res.status).toBe(200)
+    expect(createEntry).not.toHaveBeenCalled()
   })
 
   it('kicks the pipeline BEFORE acking, and a failed ack → notifyAdmin, still 200', async () => {

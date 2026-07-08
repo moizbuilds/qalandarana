@@ -12,6 +12,7 @@
 // structurer adapter — one client (and one timeout/retry config) per process,
 // defined once. See that file for why it's lazy + memoized.
 import { getOpenAIClient } from './openai-client'
+import { extFromUrl, mimeFromExt } from '../audio-format'
 
 // Download the audio Blob, hand it to Whisper, return the plain text.
 // We omit the `language` hint on purpose: the notes mix Urdu and Punjabi, so we
@@ -22,7 +23,12 @@ export async function transcribe(audioUrl: string): Promise<string> {
   const res = await fetch(audioUrl, { signal: AbortSignal.timeout(60_000) })
   if (!res.ok) throw new Error(`Audio download failed: ${res.status}`)
 
-  const file = new File([await res.blob()], 'note.ogg', { type: 'audio/ogg' })
+  // Whisper decides how to decode the file from its FILENAME extension, so we
+  // name it after the blob's real extension (mp3 for forwarded WhatsApp audio,
+  // ogg for a native voice note). Mislabeling mp3 bytes as .ogg makes Whisper
+  // reject the file — see audio-format.ts.
+  const ext = extFromUrl(audioUrl)
+  const file = new File([await res.blob()], `note.${ext}`, { type: mimeFromExt(ext) })
   const text = await getOpenAIClient().audio.transcriptions.create({
     model: 'whisper-1',
     file,
