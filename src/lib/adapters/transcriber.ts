@@ -12,7 +12,7 @@
 // structurer adapter — one client (and one timeout/retry config) per process,
 // defined once. See that file for why it's lazy + memoized.
 import { getOpenAIClient } from './openai-client'
-import { extFromUrl, mimeFromExt } from '../audio-format'
+import { extFromUrl, mimeFromExt, sniffAudioExt } from '../audio-format'
 
 // Download the audio Blob, hand it to Whisper, return the plain text.
 // We omit the `language` hint on purpose: the notes mix Urdu and Punjabi, so we
@@ -23,12 +23,15 @@ export async function transcribe(audioUrl: string): Promise<string> {
   const res = await fetch(audioUrl, { signal: AbortSignal.timeout(60_000) })
   if (!res.ok) throw new Error(`Audio download failed: ${res.status}`)
 
-  // Whisper decides how to decode the file from its FILENAME extension, so we
-  // name it after the blob's real extension (mp3 for forwarded WhatsApp audio,
-  // ogg for a native voice note). Mislabeling mp3 bytes as .ogg makes Whisper
-  // reject the file — see audio-format.ts.
-  const ext = extFromUrl(audioUrl)
-  const file = new File([await res.blob()], `note.${ext}`, { type: mimeFromExt(ext) })
+  // Whisper decides how to decode the file from its FILENAME extension, so the
+  // name MUST match the real content. We sniff the actual bytes (authoritative)
+  // rather than trust the blob's extension, which itself came from Telegram's
+  // unreliable mime_type: a forwarded note labeled audio/mpeg is often really an
+  // M4A, and a note.mp3 that is really M4A makes Whisper reject it. Fall back to
+  // the URL extension only when the magic bytes are unrecognized.
+  const bytes = new Uint8Array(await res.arrayBuffer())
+  const ext = sniffAudioExt(bytes) ?? extFromUrl(audioUrl)
+  const file = new File([bytes], `note.${ext}`, { type: mimeFromExt(ext) })
   const text = await getOpenAIClient().audio.transcriptions.create({
     model: 'whisper-1',
     file,

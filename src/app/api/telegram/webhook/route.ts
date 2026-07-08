@@ -20,7 +20,7 @@ import { getEnv } from '@/lib/env'
 import { createEntry, getEntryByTelegramMessageId } from '@/lib/entries'
 import { sendTelegramMessage, getTelegramFileUrl, notifyAdmin } from '@/lib/telegram'
 import { triggerAdvance } from '@/lib/advance-call'
-import { extFromMime } from '@/lib/audio-format'
+import { extFromMime, sniffAudioExt } from '@/lib/audio-format'
 
 // Telegram's voice notes cap at 25 minutes here (1500s). Whisper cost + Vercel
 // function time both scale with length, so anything longer is bounced with an
@@ -133,10 +133,12 @@ export async function POST(request: Request): Promise<Response> {
     // voice notes. A random suffix stops sequential/guessable pathnames (e.g. by
     // message_id) from being enumerable; the DB stores whatever suffixed URL put()
     // actually returns, so nothing needs to reconstruct the pathname later.
-    // Store under the real extension (mp3 for forwarded WhatsApp audio, ogg for a
-    // native voice note) so Whisper can later decode it by filename — see
-    // audio-format.ts. The DB keeps whatever suffixed URL put() returns.
-    const ext = extFromMime(media.mime_type)
+    // Store under the file's REAL extension, sniffed from its magic bytes rather
+    // than Telegram's unreliable mime_type (a forwarded note labeled audio/mpeg
+    // is often really an M4A). This makes the blob's content-type correct for
+    // playback AND lets Whisper decode it by filename. Fall back to the mime
+    // guess only when the bytes are unrecognized. See audio-format.ts.
+    const ext = sniffAudioExt(audioBuffer) ?? extFromMime(media.mime_type)
     const blob = await put(`audio/${message.message_id}.${ext}`, audioBuffer, { access: 'public', addRandomSuffix: true })
 
     const entry = await createEntry({
