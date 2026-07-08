@@ -12,7 +12,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { getEnv } from '../env'
 import { getOpenAIClient } from './openai-client'
-import { SYSTEM_PROMPT } from './structurer-prompt'
+import { buildSystemPrompt } from './structurer-prompt'
 
 // Model IDs as named constants: the taste test edits these in one place, and it's
 // obvious what to re-check. verify current IDs at deploy time (Task 15).
@@ -24,16 +24,21 @@ export const OPENAI_MODEL = 'gpt-5'
 // CONCEPT: zod schema = one source of truth for both the runtime shape check AND
 // the TypeScript type (via z.infer). The pipeline and DB layer import this type,
 // so the validated fields and the compile-time type can never drift apart.
+// Resilient by design: the reciter's workflow is AI-draft then admin-edit, so a
+// field the model occasionally omits (poet_name, a stray title, the context)
+// should NOT fail the whole structuring and strand the entry. It fills a safe
+// default that the admin fixes. The KALAM itself stays required: if the verse
+// is missing, something is genuinely wrong and we want to know.
 export const StructuredEntrySchema = z.object({
-  title: z.string().min(1),
-  poet_name: z.string().min(1), // "Unknown" is allowed — it's still a non-empty string
-  maqam_slug: z.enum(['talab', 'ishq', 'marifat', 'istighna', 'tawhid', 'hairat', 'fana']),
+  title: z.string().optional().transform((v) => (v && v.trim()) || 'Untitled'),
+  poet_name: z.string().optional().transform((v) => (v && v.trim()) || 'Unknown'),
+  maqam_slug: z.enum(['talab', 'ishq', 'marifat', 'istighna', 'tawhid', 'hairat', 'fana']).catch('talab'),
   kalam_original: z.string().min(1),
   kalam_roman: z.string().min(1),
   kalam_english: z.string().min(1),
-  explanation_original: z.string(),
-  explanation_english: z.string(),
-  corrections: z.array(z.object({ heard: z.string(), restored: z.string() })),
+  explanation_original: z.string().optional().transform((v) => v ?? ''),
+  explanation_english: z.string().optional().transform((v) => v ?? ''),
+  corrections: z.array(z.object({ heard: z.string(), restored: z.string() })).optional().transform((v) => v ?? []),
 })
 export type StructuredEntry = z.infer<typeof StructuredEntrySchema>
 
@@ -50,9 +55,9 @@ function getAnthropicClient(): Anthropic {
 }
 
 // Ask Claude and return its raw text. Exported for the Task 15 taste test.
-export async function viaClaude(raw: string): Promise<string> {
+export async function viaClaude(raw: string, knownPoets: string[] = []): Promise<string> {
   const msg = await getAnthropicClient().messages.create({
-    model: CLAUDE_MODEL, max_tokens: 4096, system: SYSTEM_PROMPT,
+    model: CLAUDE_MODEL, max_tokens: 4096, system: buildSystemPrompt(knownPoets),
     messages: [{ role: 'user', content: USER_PREFIX + raw }],
   })
   // CONCEPT: never assume the response shape. Claude returns an array of content
@@ -64,10 +69,10 @@ export async function viaClaude(raw: string): Promise<string> {
 }
 
 // Ask GPT and return its raw text. Exported for the Task 15 taste test.
-export async function viaOpenAI(raw: string): Promise<string> {
+export async function viaOpenAI(raw: string, knownPoets: string[] = []): Promise<string> {
   const res = await getOpenAIClient().chat.completions.create({
     model: OPENAI_MODEL, response_format: { type: 'json_object' },
-    messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: USER_PREFIX + raw }],
+    messages: [{ role: 'system', content: buildSystemPrompt(knownPoets) }, { role: 'user', content: USER_PREFIX + raw }],
   })
   // Same discipline: don't trust the shape — guard the nullable content field.
   const text = res.choices[0]?.message?.content
@@ -75,10 +80,13 @@ export async function viaOpenAI(raw: string): Promise<string> {
   return text
 }
 
-// Public entry point the pipeline's structure stage (Task 9) calls.
-export async function structureEntry(rawTranscript: string): Promise<StructuredEntry> {
+// Public entry point the pipeline's structure stage (Task 9) calls. knownPoets
+// is the archive's exact poet names, so attribution matches the DB reliably.
+export async function structureEntry(rawTranscript: string, knownPoets: string[] = []): Promise<StructuredEntry> {
   const provider = getEnv().STRUCTURER_PROVIDER
-  const text = provider === 'claude' ? await viaClaude(rawTranscript) : await viaOpenAI(rawTranscript)
+  const text = provider === 'claude'
+    ? await viaClaude(rawTranscript, knownPoets)
+    : await viaOpenAI(rawTranscript, knownPoets)
   // CONCEPT: never trust LLM output shape — parse it through zod so bad JSON fails
   // loudly HERE, not as undefined fields on the review page. Slicing between the
   // first '{' and last '}' also survives ```json markdown fences the model may add.

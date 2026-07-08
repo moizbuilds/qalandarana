@@ -62,7 +62,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ token: 
         <>
           <GoldRule className="w-full" />
           <section className="w-full space-y-4">
-            <p className="eyebrow text-center" style={{ opacity: 0.55 }}>Your explanation</p>
+            <p className="eyebrow text-center" style={{ opacity: 0.55 }}>Context</p>
             {entry.explanationOriginal ? (
               <p dir="rtl" lang="ur" className="urdu" style={{ fontSize: '1.25rem', lineHeight: 2.2 }}>{entry.explanationOriginal}</p>
             ) : null}

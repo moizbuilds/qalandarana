@@ -15,6 +15,7 @@ import { db } from '@/lib/db'
 import { poets, maqamat } from '@/lib/schema'
 import { getEntryById } from '@/lib/entries'
 import { saveEntry, retryAction, advanceAction, resendReviewAction, publishNowAction } from './actions'
+import { SubmitButton } from './SubmitButton'
 
 // Mid-pipeline statuses that have a next stage but no other action button. The
 // "Advance pipeline" button re-kicks the advance route for these (mirrors the
@@ -103,7 +104,14 @@ export default async function AdminEntryPage({ params }: { params: Promise<{ id:
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
-              <label htmlFor="poetId" className="block text-sm font-medium text-gray-700">Poet</label>
+              <div className="flex items-baseline justify-between">
+                <label htmlFor="poetId" className="block text-sm font-medium text-gray-700">Poet</label>
+                {/* Jump to poet management in a new tab so unsaved entry edits
+                    aren't lost; add the missing poet, come back, reload, select. */}
+                <a href="/admin/poets" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-700 underline">
+                  Add or edit poets ↗
+                </a>
+              </div>
               <select id="poetId" name="poetId" defaultValue={entry.poetId ?? ''} className="w-full rounded border border-gray-300 p-2">
                 <option value="">None</option>
                 {allPoets.map((p) => <option key={p.id} value={p.id}>{p.nameEnglish}</option>)}
@@ -118,7 +126,7 @@ export default async function AdminEntryPage({ params }: { params: Promise<{ id:
             </div>
           </div>
 
-          <button type="submit" className="rounded bg-black px-4 py-2 text-white">Save changes</button>
+          <SubmitButton className="bg-black" pendingLabel="Saving…">Save changes</SubmitButton>
         </form>
       </section>
 
@@ -129,22 +137,22 @@ export default async function AdminEntryPage({ params }: { params: Promise<{ id:
       <section className="flex flex-wrap gap-3 border-t border-gray-200 pt-6">
         {entry.status === 'failed' ? (
           <form action={retryAction.bind(null, id)}>
-            <button className="rounded bg-amber-600 px-4 py-2 text-white">Retry</button>
+            <SubmitButton className="bg-amber-600" pendingLabel="Retrying…">Retry</SubmitButton>
           </form>
         ) : null}
         {ADVANCEABLE.includes(entry.status) ? (
           <form action={advanceAction.bind(null, id)}>
-            <button className="rounded bg-indigo-600 px-4 py-2 text-white">Advance pipeline</button>
+            <SubmitButton className="bg-indigo-600" pendingLabel="Advancing…">Advance pipeline</SubmitButton>
           </form>
         ) : null}
         {entry.status === 'needs_fix' ? (
           <form action={resendReviewAction.bind(null, id)}>
-            <button className="rounded bg-blue-700 px-4 py-2 text-white">Resend review link</button>
+            <SubmitButton className="bg-blue-700" pendingLabel="Sending…">Resend review link</SubmitButton>
           </form>
         ) : null}
         {entry.status === 'in_review' || entry.status === 'needs_fix' ? (
           <form action={publishNowAction.bind(null, id)}>
-            <button className="rounded bg-green-700 px-4 py-2 text-white">Publish now</button>
+            <SubmitButton className="bg-green-700" pendingLabel="Publishing…">Publish now</SubmitButton>
           </form>
         ) : null}
       </section>

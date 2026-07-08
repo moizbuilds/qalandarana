@@ -20,19 +20,30 @@ import { applyValidEnv } from './test-fixtures'
 // they reference must exist even earlier. vi.hoisted() runs its callback at that
 // same hoisted point and hands the spies back here — the only safe way to share
 // mock functions between the factories and the tests below.
-const { getEntryById, transition, transcribe, structureEntry, sendTelegramMessage, notifyAdmin, dbSelectLimit } =
+const { getEntryById, transition, transcribe, structureEntry, sendTelegramMessage, notifyAdmin, dbSelectLimit, dbSelectFrom } =
   vi.hoisted(() => ({
     getEntryById: vi.fn(), transition: vi.fn(), transcribe: vi.fn(), structureEntry: vi.fn(),
-    sendTelegramMessage: vi.fn(), notifyAdmin: vi.fn(), dbSelectLimit: vi.fn(),
+    sendTelegramMessage: vi.fn(), notifyAdmin: vi.fn(), dbSelectLimit: vi.fn(), dbSelectFrom: vi.fn(),
   }))
 
 vi.mock('./entries', () => ({ getEntryById, transition }))
 vi.mock('./adapters/transcriber', () => ({ transcribe }))
 vi.mock('./adapters/structurer', () => ({ structureEntry }))
 vi.mock('./telegram', () => ({ sendTelegramMessage, notifyAdmin }))
-// The terminal `.limit()` of the chainable query is the only part we control.
+// The structure stage runs three queries: `select().from()` (all poets, awaited
+// directly) then two `select().from().where().limit()` (poet + maqam resolve).
+// So from() returns a thenable (resolves via dbSelectFrom for the awaited case)
+// that ALSO carries .where().limit() for the resolve queries.
 vi.mock('./db', () => ({
-  db: { select: () => ({ from: () => ({ where: () => ({ limit: dbSelectLimit }) }) }) },
+  db: {
+    select: () => ({
+      from: () => ({
+        where: () => ({ limit: dbSelectLimit }),
+        then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+          Promise.resolve(dbSelectFrom()).then(resolve, reject),
+      }),
+    }),
+  },
 }))
 
 import { advanceEntry, rewindFailedEntry } from './pipeline'
@@ -90,13 +101,14 @@ it('transcribe stage: transcribes the audio and transitions to transcribed', asy
 it('structure stage: resolves poetId + maqamId and stores every structured field', async () => {
   getEntryById.mockResolvedValue(baseEntry({ status: 'transcribed', rawTranscript: 'raw' }))
   structureEntry.mockResolvedValue(validStructured)
+  dbSelectFrom.mockResolvedValue([{ name: 'Baba Farid' }]) // the known-poets query
   // First lookup = poets, second = maqamat (that is the order pipeline.ts queries).
   dbSelectLimit.mockResolvedValueOnce([{ id: 'poet-1' }]).mockResolvedValueOnce([{ id: 'maqam-1' }])
   transition.mockResolvedValue(baseEntry({ status: 'structured' }))
 
   const status = await advanceEntry('entry-1')
 
-  expect(structureEntry).toHaveBeenCalledWith('raw')
+  expect(structureEntry).toHaveBeenCalledWith('raw', ['Baba Farid'])
   expect(transition).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'entry-1' }),
     'structured',
@@ -114,6 +126,7 @@ it('structure stage: resolves poetId + maqamId and stores every structured field
 it('structure stage: an unknown poet resolves to poetId null, NOT a failure', async () => {
   getEntryById.mockResolvedValue(baseEntry({ status: 'transcribed', rawTranscript: 'raw' }))
   structureEntry.mockResolvedValue({ ...validStructured, poet_name: 'Nobody Known' })
+  dbSelectFrom.mockResolvedValue([{ name: 'Baba Farid' }]) // the known-poets query
   dbSelectLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'maqam-1' }])
   transition.mockResolvedValue(baseEntry({ status: 'structured' }))
 

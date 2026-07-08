@@ -46,7 +46,7 @@ export function CreatePoetForm() {
       <h2 className="font-semibold">Add a poet</h2>
       <Fields />
       <div className="flex items-center gap-3">
-        <button disabled={pending} className="rounded bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50">
+        <button disabled={pending} className="rounded bg-gray-900 px-4 py-2 text-sm text-white transition-transform duration-75 hover:brightness-110 active:scale-95 disabled:opacity-50">
           {pending ? 'Adding…' : 'Add poet'}
         </button>
         <Feedback state={state} />
@@ -67,7 +67,7 @@ export function EditPoetForm({ poet }: { poet: Poet }) {
       </div>
       <Fields poet={poet} />
       <div className="flex items-center gap-3">
-        <button disabled={pending} className="rounded border border-gray-300 px-4 py-2 text-sm disabled:opacity-50">
+        <button disabled={pending} className="rounded border border-gray-300 px-4 py-2 text-sm transition-transform duration-75 hover:bg-gray-50 active:scale-95 disabled:opacity-50">
           {pending ? 'Saving…' : 'Save changes'}
         </button>
         <Feedback state={state} />

@@ -95,7 +95,10 @@ async function runStage(entry: Entry, stage: Stage): Promise<Entry> {
       // string 'null'. A null here means a bug upstream, so fail loudly → capture.
       if (entry.rawTranscript == null) throw new Error('Cannot structure an entry with no transcript')
 
-      const structured = await structureEntry(entry.rawTranscript)
+      // Hand the model the archive's exact poet names so it attributes to one of
+      // them (Farid/Fareed spelling drift otherwise leaves the poet unresolved).
+      const knownPoets = (await db.select({ name: poets.nameEnglish }).from(poets)).map((p) => p.name)
+      const structured = await structureEntry(entry.rawTranscript, knownPoets)
       // Resolve the model's human names to our foreign keys. An unknown poet is
       // NOT a failure — the admin can assign one on the review page — so it maps
       // to null, not a throw.
